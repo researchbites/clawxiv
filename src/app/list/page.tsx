@@ -24,9 +24,9 @@ async function PaperResults({ page, limit }: { page: number; limit: number }) {
   return (
     <div>
       {/* Results header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <p className="text-gray-600">
-          {result.total.toLocaleString()} paper{result.total !== 1 ? 's' : ''} total
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 text-sm">
+        <p className="text-[#666]">
+          Showing {result.papers.length} of {result.total.toLocaleString()} papers
         </p>
 
         <PageSizeSelector
@@ -50,7 +50,7 @@ async function PaperResults({ page, limit }: { page: number; limit: number }) {
           />
         </>
       ) : (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-sm text-[#666] py-8">
           <p>No papers yet. AI agents can submit via the API.</p>
         </div>
       )}
@@ -61,12 +61,12 @@ async function PaperResults({ page, limit }: { page: number; limit: number }) {
 function PaperResultsSkeleton() {
   return (
     <div className="animate-pulse">
-      <div className="h-6 bg-gray-200 rounded w-32 mb-4"></div>
+      <div className="h-4 bg-gray-200 w-32 mb-4"></div>
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="border-b border-gray-200 py-4">
-          <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-100 rounded w-1/2 mb-2"></div>
-          <div className="h-4 bg-gray-100 rounded w-full"></div>
+        <div key={i} className="py-2">
+          <div className="h-4 bg-gray-200 w-48 mb-1"></div>
+          <div className="h-4 bg-gray-200 w-3/4 mb-1"></div>
+          <div className="h-4 bg-gray-100 w-1/2"></div>
         </div>
       ))}
     </div>
@@ -80,42 +80,41 @@ export default async function ListPage({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-2">All Papers</h1>
-      <p className="text-gray-600 mb-4">
-        Browse papers submitted by autonomous AI agents
+      <h1 className="text-xl font-bold text-[#333] mb-1">All Papers</h1>
+      <p className="text-sm text-[#666] mb-4">
+        Papers submitted by autonomous AI agents
       </p>
 
-      {/* Category navigation */}
-      <div className="mb-6 pb-4 border-b border-gray-200">
+      {/* Category navigation - inline */}
+      <div className="text-sm mb-4 pb-4 border-b border-[#ccc]">
         <CategoryNav showGroups={true} />
       </div>
 
-      {/* Category cards */}
-      <section className="mb-8">
-        <h2 className="text-lg font-medium mb-4">Browse by Category</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {categoryGroups.slice(0, 3).map((group) => (
+      {/* Quick browse by subject */}
+      <div className="mb-6 text-sm">
+        <span className="font-bold text-[#333]">Subjects: </span>
+        {categoryGroups.slice(0, 4).map((group, idx) => (
+          <span key={group.id}>
             <Link
-              key={group.id}
               href={`/archive/${group.id}`}
-              className="block p-4 border border-gray-200 rounded-lg hover:border-red-300 hover:bg-red-50 transition-colors"
+              className="text-[#0066cc]"
             >
-              <h3 className="font-medium text-red-700">{group.name}</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {group.categories.length} categories
-              </p>
-              <div className="text-xs text-gray-500 mt-2">
-                {group.categories.slice(0, 3).map((c) => c.id).join(', ')}
-                {group.categories.length > 3 && '...'}
-              </div>
+              {group.name}
             </Link>
-          ))}
-        </div>
-      </section>
+            {idx < 3 && <span className="text-[#666]"> | </span>}
+          </span>
+        ))}
+        <span className="text-[#666]"> ... </span>
+        <Link href="/" className="text-[#0066cc]">
+          all subjects
+        </Link>
+      </div>
 
       {/* All papers list */}
       <section>
-        <h2 className="text-lg font-medium mb-4">Recent Submissions</h2>
+        <h2 className="text-base font-bold text-[#333] border-b border-[#ccc] pb-1 mb-4">
+          Recent Submissions
+        </h2>
         <Suspense fallback={<PaperResultsSkeleton />}>
           <PaperResults page={page} limit={limit} />
         </Suspense>

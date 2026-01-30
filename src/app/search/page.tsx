@@ -55,17 +55,17 @@ async function SearchResults({ searchParams }: { searchParams: Props['searchPara
   return (
     <div>
       {/* Results header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 text-sm">
         <div>
           {hasQuery ? (
-            <p className="text-gray-600">
+            <p className="text-[#666]">
               {result.total.toLocaleString()} result{result.total !== 1 ? 's' : ''}
-              {query && <> for &ldquo;<span className="font-medium">{query}</span>&rdquo;</>}
-              {category && <> in <span className="font-medium">{category}</span></>}
+              {query && <> for <span className="font-bold text-[#333]">{query}</span></>}
+              {category && <> in <span className="font-bold text-[#333]">{category}</span></>}
             </p>
           ) : (
-            <p className="text-gray-600">
-              Enter a search query or use filters to find papers
+            <p className="text-[#666]">
+              Enter a search query or use filters
             </p>
           )}
         </div>
@@ -91,14 +91,14 @@ async function SearchResults({ searchParams }: { searchParams: Props['searchPara
           />
         </>
       ) : hasQuery ? (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-sm text-[#666] py-8">
           <p>No papers found matching your search criteria.</p>
           <p className="mt-2">
-            <Link href="/search/advanced" className="text-blue-600 hover:underline">
+            <Link href="/search/advanced" className="text-[#0066cc]">
               Try advanced search
             </Link>
             {' '}or{' '}
-            <Link href="/list" className="text-blue-600 hover:underline">
+            <Link href="/list" className="text-[#0066cc]">
               browse all papers
             </Link>
           </p>
@@ -111,12 +111,12 @@ async function SearchResults({ searchParams }: { searchParams: Props['searchPara
 function SearchResultsSkeleton() {
   return (
     <div className="animate-pulse">
-      <div className="h-6 bg-gray-200 rounded w-48 mb-4"></div>
+      <div className="h-4 bg-gray-200 w-48 mb-4"></div>
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="border-b border-gray-200 py-4">
-          <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-100 rounded w-1/2 mb-2"></div>
-          <div className="h-4 bg-gray-100 rounded w-full"></div>
+        <div key={i} className="py-2">
+          <div className="h-4 bg-gray-200 w-48 mb-1"></div>
+          <div className="h-4 bg-gray-200 w-3/4 mb-1"></div>
+          <div className="h-4 bg-gray-100 w-1/2"></div>
         </div>
       ))}
     </div>
@@ -129,25 +129,26 @@ export default async function SearchPage({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Search Papers</h1>
+      <h1 className="text-xl font-bold text-[#333] mb-4">Search Papers</h1>
 
       {/* Search bar */}
       <SearchBar
         defaultValue={query}
         placeholder="Search by title, author, or abstract..."
-        className="mb-6"
+        className="mb-4"
       />
 
+      {/* Inline filters + results */}
       <div className="flex flex-col md:flex-row gap-6">
         {/* Filters sidebar */}
-        <aside className="md:w-64 shrink-0">
-          <Suspense fallback={<div className="h-64 bg-gray-100 rounded animate-pulse" />}>
+        <aside className="md:w-48 shrink-0 text-sm">
+          <Suspense fallback={<div className="h-48 bg-gray-100 animate-pulse" />}>
             <SearchFilters />
           </Suspense>
 
-          <div className="mt-4 text-sm">
-            <Link href="/search/advanced" className="text-blue-600 hover:underline">
-              Advanced Search →
+          <div className="mt-3 pt-3 border-t border-[#ccc]">
+            <Link href="/search/advanced" className="text-[#0066cc]">
+              Advanced Search
             </Link>
           </div>
         </aside>

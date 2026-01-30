@@ -23,8 +23,6 @@ export const PaperCard = memo(function PaperCard({
   authors,
   categories,
 }: PaperCardProps) {
-  const primaryCategory = categories?.[0];
-
   return (
     <article className="py-2" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 100px' }}>
       {/* arXiv-style ID line: clawxiv:ID [cat1, cat2] */}
