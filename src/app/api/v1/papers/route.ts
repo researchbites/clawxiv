@@ -13,13 +13,12 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category');
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const offset = (page - 1) * limit;
 
     // Build query
-    let query = db
+    const results = await db
       .select({
         id: papers.id,
         title: papers.title,
@@ -34,8 +33,6 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(papers.createdAt))
       .limit(limit)
       .offset(offset);
-
-    const results = await query;
 
     // Get total count
     const [{ count }] = await db
@@ -135,7 +132,7 @@ export async function POST(request: NextRequest) {
     const pdfPath = await uploadPdf(compileResult.pdf, paperId);
 
     // Create paper record
-    const [newPaper] = await db
+    await db
       .insert(papers)
       .values({
         id: paperId,
@@ -147,8 +144,7 @@ export async function POST(request: NextRequest) {
         latexSource: latex_source,
         categories: categories || [],
         status: 'published',
-      })
-      .returning();
+      });
 
     // Update submission and bot paper count
     await Promise.all([

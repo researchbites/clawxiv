@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { memo } from 'react';
 
 type Author = {
   name: string;
@@ -15,7 +16,14 @@ type PaperCardProps = {
   createdAt: Date | null;
 };
 
-export function PaperCard({ id, title, abstract, authors, categories, createdAt }: PaperCardProps) {
+export const PaperCard = memo(function PaperCard({
+  id,
+  title,
+  abstract,
+  authors,
+  categories,
+  createdAt,
+}: PaperCardProps) {
   const formattedDate = createdAt
     ? new Date(createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -25,58 +33,90 @@ export function PaperCard({ id, title, abstract, authors, categories, createdAt 
     : null;
 
   return (
-    <article className="border-b border-gray-200 py-4">
+    <article className="border-b border-gray-200 py-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 180px' }}>
       <div className="flex items-start gap-4">
-        <div className="flex-1">
-          <h2 className="text-lg font-medium">
+        <div className="flex-1 min-w-0">
+          {/* Paper ID and Categories */}
+          <div className="flex flex-wrap items-center gap-2 text-xs mb-1">
+            <Link
+              href={`/abs/${id}`}
+              className="font-mono text-red-700 hover:text-red-900"
+            >
+              {id}
+            </Link>
+            {categories && categories.length > 0 && (
+              <>
+                <span className="text-gray-400">[</span>
+                {categories.map((cat, idx) => (
+                  <span key={cat}>
+                    <Link
+                      href={`/list/${cat}/recent`}
+                      className="text-gray-600 hover:text-red-700"
+                    >
+                      {cat}
+                    </Link>
+                    {idx < categories.length - 1 && ', '}
+                  </span>
+                ))}
+                <span className="text-gray-400">]</span>
+              </>
+            )}
+            {formattedDate && (
+              <span className="text-gray-400">{formattedDate}</span>
+            )}
+          </div>
+
+          {/* Title */}
+          <h2 className="text-base font-medium leading-snug">
             <Link href={`/abs/${id}`} className="text-blue-700 hover:text-blue-900">
               {title}
             </Link>
           </h2>
 
+          {/* Authors */}
           {authors && authors.length > 0 && (
             <p className="text-sm text-gray-600 mt-1">
               {authors.map((a, i) => (
                 <span key={i}>
-                  {a.name}
-                  {a.isBot && <span className="text-xs ml-1">[bot]</span>}
+                  <Link
+                    href={`/search?author=${encodeURIComponent(a.name)}`}
+                    className="hover:text-red-700"
+                  >
+                    {a.name}
+                  </Link>
+                  {a.isBot && (
+                    <span className="text-xs ml-0.5 text-gray-400">[bot]</span>
+                  )}
                   {i < authors.length - 1 && ', '}
                 </span>
               ))}
             </p>
           )}
 
+          {/* Abstract preview */}
           {abstract && (
-            <p className="text-sm text-gray-700 mt-2 line-clamp-3">
+            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
               {abstract}
             </p>
           )}
-
-          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-            <span className="font-mono">{id}</span>
-            {formattedDate && <span>{formattedDate}</span>}
-            {categories && categories.length > 0 && (
-              <span className="flex gap-1">
-                {categories.map((cat) => (
-                  <span
-                    key={cat}
-                    className="bg-gray-100 px-1.5 py-0.5 rounded"
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </span>
-            )}
-          </div>
         </div>
 
-        <Link
-          href={`/pdf/${id}`}
-          className="text-sm text-red-700 hover:text-red-900 whitespace-nowrap"
-        >
-          pdf
-        </Link>
+        {/* Actions */}
+        <div className="flex flex-col gap-1 text-xs shrink-0">
+          <Link
+            href={`/pdf/${id}`}
+            className="text-red-700 hover:text-red-900 hover:underline"
+          >
+            pdf
+          </Link>
+          <Link
+            href={`/abs/${id}`}
+            className="text-gray-500 hover:text-gray-700 hover:underline"
+          >
+            abs
+          </Link>
+        </div>
       </div>
     </article>
   );
-}
+});
