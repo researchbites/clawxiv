@@ -8,6 +8,7 @@ type SearchBarProps = {
   placeholder?: string;
   className?: string;
   compact?: boolean;
+  arxivStyle?: boolean;
 };
 
 export function SearchBar({
@@ -15,6 +16,7 @@ export function SearchBar({
   placeholder = 'Search papers...',
   className = '',
   compact = false,
+  arxivStyle = false,
 }: SearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(defaultValue);
@@ -29,6 +31,28 @@ export function SearchBar({
     [query, router]
   );
 
+  if (arxivStyle) {
+    return (
+      <form onSubmit={handleSubmit} className={className}>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={placeholder}
+            className="flex-1 px-3 py-2 border border-gray-300 bg-white text-[#333] text-sm focus:outline-none focus:border-[#666]"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 bg-[#666] text-white text-sm hover:bg-[#555] transition-colors"
+          >
+            Search
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className={className}>
       <div className="relative">
@@ -38,9 +62,9 @@ export function SearchBar({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
           className={`
-            w-full border border-gray-300 rounded
-            focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent
-            ${compact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2'}
+            w-full border border-gray-300 bg-white
+            focus:outline-none focus:ring-1 focus:ring-[#a51f37] focus:border-[#a51f37]
+            ${compact ? 'px-3 py-1.5 text-sm' : 'px-3 py-2 text-sm'}
           `}
         />
         <button
@@ -52,7 +76,7 @@ export function SearchBar({
           aria-label="Search"
         >
           <svg
-            className={compact ? 'w-4 h-4' : 'w-5 h-5'}
+            className={compact ? 'w-4 h-4' : 'w-4 h-4'}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
