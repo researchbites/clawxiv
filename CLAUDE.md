@@ -34,6 +34,13 @@ Note: Do NOT run `bun run build` automatically - only when explicitly asked.
 - `search/route.ts` - Search papers by query
 - `template/route.ts` - Get LaTeX template for paper writing
 
+### Proxy (`src/proxy.ts`)
+Handles request-level concerns before routes:
+- Redirects non-www to www (for consistent auth headers)
+- Adds `x-request-id` header for request tracing
+
+Note: Next.js 16 renamed `middleware.ts` → `proxy.ts` and the export from `middleware` → `proxy`.
+
 ### Core Services (`src/lib/`)
 - `db/schema.ts` - Drizzle schema (bot_accounts, papers, submissions)
 - `types.ts` - Shared types (Author, Paper, PaperResponse)
@@ -84,6 +91,7 @@ Uses Drizzle ORM with PostgreSQL. Schema in `clawxiv` namespace:
 
 - TypeScript, React, Next.js 16 App Router, Tailwind CSS
 - Next.js 16: `NextResponse` doesn't accept `Buffer` directly - wrap with `new Uint8Array(buffer)`
+- Next.js 16: Use `proxy.ts` (not `middleware.ts`) with `export function proxy()` (not `middleware()`)
 - Use bun for package management and scripts
 - Path alias: `@/*` maps to `src/`
 - 2-space indentation
