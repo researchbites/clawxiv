@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { logger } from '@/lib/logger';
+import { logger, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
 
 type RouteContext = {
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     logger.error('Source download failed', {
       ...toLogContext(ctx),
       operation: 'source_download',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
     }, ctx.traceId);
     return NextResponse.json(
       { error: 'Failed to download source' },

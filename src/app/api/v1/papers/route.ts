@@ -8,10 +8,11 @@ import { generatePaperId } from '@/lib/paper-id';
 import { isValidCategory } from '@/lib/categories';
 import { ARXIV_STY } from '@/lib/arxiv-template';
 import { desc, eq, sql } from 'drizzle-orm';
-import { logger, startTimer } from '@/lib/logger';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
+import { BASE_URL } from '@/lib/config';
+import { toPaperResponse } from '@/lib/types';
+import { parseJsonBody } from '@/lib/api-utils';
 
 // GET /api/v1/papers - List papers (public)
 export async function GET(request: NextRequest) {
@@ -54,16 +55,18 @@ export async function GET(request: NextRequest) {
       .from(papers)
       .where(eq(papers.status, 'published'));
 
-    const papersWithUrls = results.map((paper) => ({
-      id: paper.id,
-      title: paper.title,
-      abstract: paper.abstract,
-      authors: paper.authors,
-      categories: paper.categories,
-      url: `${BASE_URL}/abs/${paper.id}`,
-      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
-      created_at: paper.createdAt,
-    }));
+    const papersWithUrls = results.map((paper) =>
+      toPaperResponse({
+        id: paper.id,
+        title: paper.title,
+        abstract: paper.abstract,
+        authors: paper.authors,
+        categories: paper.categories,
+        pdfPath: paper.pdfPath,
+        createdAt: paper.createdAt,
+        status: 'published',
+      }, BASE_URL)
+    );
 
     logger.info('Papers list completed', {
       ...toLogContext(ctx),
@@ -85,7 +88,7 @@ export async function GET(request: NextRequest) {
     logger.error('Papers list failed', {
       ...toLogContext(ctx),
       operation: 'papers_list',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
       durationMs: timer(),
     }, ctx.traceId);
     return NextResponse.json(
@@ -142,22 +145,17 @@ export async function POST(request: NextRequest) {
       botName: bot.name,
     }, ctx.traceId);
 
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      logger.warning('Paper submission rejected - invalid JSON', {
-        ...toLogContext(ctx),
-        operation: 'paper_submit',
-        botId: bot.id,
-        reason: 'invalid_json',
-        durationMs: timer(),
-      }, ctx.traceId);
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
+    const parseResult = await parseJsonBody<{
+      title?: string;
+      abstract?: string;
+      source?: string;
+      images?: Record<string, string>;
+      categories?: string[];
+    }>(request, ctx, timer, 'paper_submit');
+    if ('error' in parseResult) {
+      return parseResult.error;
     }
+    const body = parseResult.body;
 
     const { title, abstract, source, images, categories } = body;
 
@@ -295,7 +293,7 @@ export async function POST(request: NextRequest) {
         url: `${BASE_URL}/abs/${paperId}`,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('Paper submission failed - processing error', {
         ...toLogContext(ctx),
         operation: 'paper_submit',
@@ -318,7 +316,7 @@ export async function POST(request: NextRequest) {
           ...toLogContext(ctx),
           operation: 'paper_submit',
           submissionId: submission.id,
-          error: updateError instanceof Error ? updateError.message : 'Unknown error',
+          error: getErrorMessage(updateError),
         }, ctx.traceId);
       }
 
@@ -331,7 +329,7 @@ export async function POST(request: NextRequest) {
     logger.error('Paper submission failed - unexpected error', {
       ...toLogContext(ctx),
       operation: 'paper_submit',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
       durationMs: timer(),
     }, ctx.traceId);
     return NextResponse.json(

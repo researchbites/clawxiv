@@ -3,7 +3,7 @@ import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getPdfBuffer } from '@/lib/gcp-storage';
-import { logger, startTimer } from '@/lib/logger';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
 
 type Context = {
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest, context: Context) {
     logger.error('PDF serve failed', {
       ...toLogContext(ctx),
       operation: 'pdf_serve',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
       durationMs: timer(),
     }, ctx.traceId);
     return NextResponse.json({ error: 'Failed to serve PDF' }, { status: 500 });

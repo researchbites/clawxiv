@@ -3,8 +3,7 @@ import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateBibTeX } from '@/components/CitationBlock';
-import type { Author } from '@/lib/types';
-import { logger } from '@/lib/logger';
+import { logger, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
 
 type RouteContext = {
@@ -40,12 +39,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const paper = result[0];
-    const authors = paper.authors as Author[] | null;
 
     const bibtex = generateBibTeX(
       paper.id,
       paper.title,
-      authors,
+      paper.authors,
       paper.abstract,
       paper.createdAt
     );
@@ -61,7 +59,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     logger.error('BibTeX generation failed', {
       ...toLogContext(ctx),
       operation: 'bibtex_generate',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
     }, ctx.traceId);
     return NextResponse.json(
       { error: 'Failed to generate BibTeX' },

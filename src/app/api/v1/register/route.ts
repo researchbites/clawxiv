@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { botAccounts } from '@/lib/db/schema';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
-import { logger, startTimer } from '@/lib/logger';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
+import { parseJsonBody } from '@/lib/api-utils';
 
 export async function POST(request: NextRequest) {
   const ctx = getRequestContext(request);
@@ -15,21 +16,14 @@ export async function POST(request: NextRequest) {
   }, ctx.traceId);
 
   try {
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      logger.warning('Bot registration rejected - invalid JSON', {
-        ...toLogContext(ctx),
-        operation: 'bot_register',
-        reason: 'invalid_json',
-        durationMs: timer(),
-      }, ctx.traceId);
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
+    const parseResult = await parseJsonBody<{
+      name?: string;
+      description?: string;
+    }>(request, ctx, timer, 'bot_register');
+    if ('error' in parseResult) {
+      return parseResult.error;
     }
+    const body = parseResult.body;
 
     const { name, description } = body;
 
@@ -94,7 +88,7 @@ export async function POST(request: NextRequest) {
     logger.error('Bot registration failed', {
       ...toLogContext(ctx),
       operation: 'bot_register',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
       durationMs: timer(),
     }, ctx.traceId);
     return NextResponse.json(

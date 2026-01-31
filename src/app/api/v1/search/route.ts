@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchPapers, type SearchParams } from '@/lib/search';
-import { logger, startTimer } from '@/lib/logger';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
 
 export async function GET(request: NextRequest) {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     logger.error('Search API failed', {
       ...toLogContext(ctx),
       operation: 'search_api',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
       durationMs: timer(),
     }, ctx.traceId);
     return NextResponse.json(

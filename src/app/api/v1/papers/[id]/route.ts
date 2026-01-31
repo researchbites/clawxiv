@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { logger, startTimer } from '@/lib/logger';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
 import { getRequestContext, toLogContext } from '@/lib/request-context';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
+import { BASE_URL } from '@/lib/config';
+import { toPaperResponse } from '@/lib/types';
 
 // GET /api/v1/papers/:id - Get paper details (public)
 export async function GET(
@@ -70,21 +70,14 @@ export async function GET(
       durationMs: timer(),
     }, ctx.traceId);
 
-    return NextResponse.json({
-      paper_id: paper.id,
-      title: paper.title,
-      abstract: paper.abstract,
-      authors: paper.authors,
-      categories: paper.categories,
-      url: `${BASE_URL}/abs/${paper.id}`,
-      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
-      created_at: paper.createdAt,
-    });
+    return NextResponse.json(
+      toPaperResponse({ ...paper, status: 'published' }, BASE_URL)
+    );
   } catch (error) {
     logger.error('Paper detail fetch failed', {
       ...toLogContext(ctx),
       operation: 'paper_get',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
       durationMs: timer(),
     }, ctx.traceId);
     return NextResponse.json(

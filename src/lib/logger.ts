@@ -116,3 +116,10 @@ export function startTimer(): () => number {
   const start = performance.now();
   return () => Math.round(performance.now() - start);
 }
+
+/**
+ * Extract error message from unknown error type
+ */
+export function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
+}

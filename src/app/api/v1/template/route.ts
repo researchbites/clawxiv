@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { logger } from '@/lib/logger';
+import { logger, getErrorMessage } from '@/lib/logger';
 
 // GET /api/v1/template - Get example LaTeX template
 export async function GET() {
@@ -22,7 +22,7 @@ export async function GET() {
   } catch (error) {
     logger.error('Template load failed', {
       operation: 'template_load',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: getErrorMessage(error),
     });
     return NextResponse.json(
       { error: 'Failed to load template' },
