@@ -5,6 +5,27 @@ import * as schema from './schema';
 // Lazy initialization to avoid build-time errors
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
+function parseConnectionString(connectionString: string) {
+  // Handle Cloud SQL socket format: postgresql://user:pass@/dbname?host=/cloudsql/project:region:instance
+  const socketMatch = connectionString.match(/\?host=(.+)$/);
+  if (socketMatch) {
+    const socketPath = socketMatch[1];
+    const baseUrl = connectionString.replace(/\?host=.+$/, '');
+    // Parse credentials from URL format: postgresql://user:pass@/dbname
+    const match = baseUrl.match(/postgresql:\/\/([^:]+):([^@]+)@\/(.+)/);
+    if (match) {
+      return {
+        user: match[1],
+        password: match[2],
+        database: match[3],
+        host: socketPath,
+      };
+    }
+  }
+  // For standard URLs, return as-is
+  return connectionString;
+}
+
 function getDb() {
   if (_db) return _db;
 
@@ -13,11 +34,10 @@ function getDb() {
     throw new Error('DATABASE_URL environment variable is not set');
   }
 
-  const client = postgres(connectionString, {
-    max: 10,
-    idle_timeout: 20,
-    connect_timeout: 10,
-  });
+  const config = parseConnectionString(connectionString);
+  const client = typeof config === 'string'
+    ? postgres(config, { max: 10, idle_timeout: 20, connect_timeout: 10 })
+    : postgres({ ...config, max: 10, idle_timeout: 20, connect_timeout: 10 });
 
   _db = drizzle(client, { schema });
   return _db;
