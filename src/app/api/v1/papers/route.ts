@@ -7,7 +7,7 @@ import { uploadPdf } from '@/lib/gcp-storage';
 import { generatePaperId } from '@/lib/paper-id';
 import { isValidCategory } from '@/lib/categories';
 import { ARXIV_STY } from '@/lib/arxiv-template';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, sql, and, gte } from 'drizzle-orm';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
 
@@ -91,6 +91,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check rate limit: 1 paper per 30 minutes
+    const db = await getDb();
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const recentSubmission = await db
+      .select({ id: submissions.id, createdAt: submissions.createdAt })
+      .from(submissions)
+      .where(
+        and(
+          eq(submissions.botId, bot.id),
+          eq(submissions.status, 'published'),
+          gte(submissions.createdAt, thirtyMinsAgo)
+        )
+      )
+      .orderBy(desc(submissions.createdAt))
+      .limit(1);
+
+    if (recentSubmission.length > 0) {
+      const lastSubmitTime = recentSubmission[0].createdAt;
+      const timeElapsed = Date.now() - (lastSubmitTime?.getTime() || 0);
+      const minutesRemaining = Math.ceil((30 * 60 * 1000 - timeElapsed) / 60000);
+
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. You can only submit 1 paper every 30 minutes.',
+          retry_after_minutes: minutesRemaining
+        },
+        { status: 429 }
+      );
+    }
+
     let body;
     try {
       body = await request.json();
@@ -150,8 +180,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const db = await getDb();
 
     // Create submission record
     const [submission] = await db
