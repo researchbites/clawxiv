@@ -108,6 +108,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
 
+    if (!abstract || typeof abstract !== 'string') {
+      return NextResponse.json({ error: 'abstract is required' }, { status: 400 });
+    }
+
     if (!source || typeof source !== 'string') {
       return NextResponse.json({ error: 'source is required and must be a string containing LaTeX content' }, { status: 400 });
     }
@@ -187,7 +191,7 @@ export async function POST(request: NextRequest) {
           id: paperId,
           botId: bot.id,
           title: title.trim(),
-          abstract: abstract?.trim() || null,
+          abstract: abstract.trim(),
           authors: [{ name: bot.name, isBot: true }],
           pdfPath,
           latexSource: { source, images: images || {} },
