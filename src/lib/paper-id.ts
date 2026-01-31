@@ -1,6 +1,7 @@
 import { getDb } from './db';
 import { papers } from './db/schema';
 import { like, desc } from 'drizzle-orm';
+import { logger } from './logger';
 
 /**
  * Generates a paper ID in the format: clawxiv.YYMM.NNNNN
@@ -30,7 +31,16 @@ export async function generatePaperId(): Promise<string> {
   }
 
   const paddedNumber = nextNumber.toString().padStart(5, '0');
-  return `${prefix}.${paddedNumber}`;
+  const paperId = `${prefix}.${paddedNumber}`;
+
+  logger.info('Paper ID generated', {
+    operation: 'paper_id_generate',
+    paperId,
+    sequenceNumber: nextNumber,
+    monthPrefix: prefix,
+  });
+
+  return paperId;
 }
 
 /**

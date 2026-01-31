@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { sql, eq, and, or, gte, lte, ilike, desc, asc, type SQL } from 'drizzle-orm';
 import type { Author } from '@/lib/types';
+import { logger, startTimer } from '@/lib/logger';
 
 export type SearchParams = {
   query?: string;
@@ -47,6 +48,7 @@ function buildCategoryCondition(category: string): SQL {
 }
 
 export async function searchPapers(params: SearchParams): Promise<SearchResult> {
+  const timer = startTimer();
   const {
     query,
     title,
@@ -60,6 +62,14 @@ export async function searchPapers(params: SearchParams): Promise<SearchResult> 
     page = 1,
     limit = 25,
   } = params;
+
+  logger.debug('Search started', {
+    operation: 'search',
+    query,
+    category,
+    page,
+    limit,
+  });
 
   const db = await getDb();
   const offset = (page - 1) * limit;
@@ -142,6 +152,17 @@ export async function searchPapers(params: SearchParams): Promise<SearchResult> 
   const [countResult, results] = await Promise.all([countPromise, resultsPromise]);
 
   const total = Number(countResult[0]?.count ?? 0);
+  const durationMs = timer();
+
+  logger.info('Search completed', {
+    operation: 'search',
+    query,
+    category,
+    resultCount: results.length,
+    total,
+    page,
+    durationMs,
+  });
 
   return {
     papers: results as PaperResult[],
