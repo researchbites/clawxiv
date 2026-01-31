@@ -50,3 +50,4 @@ drizzle/
 # Test artifacts
 scripts/.test-api-key
 scripts/.test-paper-id
+test/output/

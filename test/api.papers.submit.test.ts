@@ -1,83 +1,135 @@
-import { describe, it, expect, beforeAll, setDefaultTimeout } from 'bun:test';
-import { log, LATEX_COMPILER_URL } from './utils';
+import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from 'bun:test';
+import { log, BASE_URL } from './utils';
+import { getDb } from '../src/lib/db';
+import { botAccounts, papers, submissions } from '../src/lib/db/schema';
+import { hashApiKey } from '../src/lib/api-key';
+import { eq } from 'drizzle-orm';
 import { readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 setDefaultTimeout(120000);
 
 const TEMPLATE_DIR = join(process.cwd(), 'public/template');
-const OUTPUT_PDF = join(process.cwd(), 'test/output/compiled-template.pdf');
+const OUTPUT_DIR = join(process.cwd(), 'test/output');
+const OUTPUT_PDF = join(OUTPUT_DIR, 'submitted-paper.pdf');
 
-describe('POST /api/v1/papers - Multi-file submission', () => {
-  let files: Record<string, string>;
+const TEST_BOT_NAME = 'clawxiv-submit-test-bot';
+const TEST_API_KEY = 'clx_test_submit_key_12345678';
+const TEST_API_KEY_HASH = hashApiKey(TEST_API_KEY);
 
-  beforeAll(() => {
-    mkdirSync(join(process.cwd(), 'test/output'), { recursive: true });
+describe('POST /api/v1/papers - Submit and Download PDF', () => {
+  let testBotId: string;
+  let createdPaperId: string | null = null;
+  let source: string;
+  let images: Record<string, string>;
 
-    log('SETUP', 'Loading template files from public/template/');
+  beforeAll(async () => {
+    mkdirSync(OUTPUT_DIR, { recursive: true });
 
-    // Text files: plain strings
-    const templateTex = readFileSync(join(TEMPLATE_DIR, 'template.tex'), 'utf-8');
-    const arxivSty = readFileSync(join(TEMPLATE_DIR, 'arxiv.sty'), 'utf-8');
-    const referencesBib = readFileSync(join(TEMPLATE_DIR, 'references.bib'), 'utf-8');
+    log('SETUP', 'Creating test bot account');
+    const db = await getDb();
 
-    // Binary files: base64 encoded
-    const testPng = readFileSync(join(TEMPLATE_DIR, 'test.png')).toString('base64');
+    // Clean up existing test bot
+    const existingBot = await db
+      .select()
+      .from(botAccounts)
+      .where(eq(botAccounts.name, TEST_BOT_NAME))
+      .limit(1);
 
-    files = {
-      'template.tex': templateTex,
-      'arxiv.sty': arxivSty,
-      'references.bib': referencesBib,
-      'test.png': testPng,
+    if (existingBot.length > 0) {
+      await db.delete(submissions).where(eq(submissions.botId, existingBot[0].id));
+      await db.delete(papers).where(eq(papers.botId, existingBot[0].id));
+      await db.delete(botAccounts).where(eq(botAccounts.id, existingBot[0].id));
+    }
+
+    // Create test bot
+    const [bot] = await db
+      .insert(botAccounts)
+      .values({
+        name: TEST_BOT_NAME,
+        apiKeyHash: TEST_API_KEY_HASH,
+        description: 'Submit test bot',
+      })
+      .returning();
+
+    testBotId = bot.id;
+    log('SETUP', `Test bot created: ${testBotId}`);
+
+    // Load template files
+    source = readFileSync(join(TEMPLATE_DIR, 'template.tex'), 'utf-8');
+    images = {
+      'test.png': readFileSync(join(TEMPLATE_DIR, 'test.png')).toString('base64'),
     };
 
-    log('SETUP', 'Files loaded', {
-      'template.tex': `${templateTex.length} chars`,
-      'arxiv.sty': `${arxivSty.length} chars`,
-      'references.bib': `${referencesBib.length} chars`,
-      'test.png': `${testPng.length} chars (base64)`,
+    log('SETUP', 'Template loaded', {
+      sourceLength: source.length,
+      images: Object.keys(images),
     });
   });
 
-  it('compiles multi-file arXiv template and saves PDF', async () => {
-    log('COMPILE', 'Sending to compiler', { url: LATEX_COMPILER_URL });
+  afterAll(async () => {
+    log('CLEANUP', 'Cleaning up test bot (keeping paper for PDF viewing)');
+    const db = await getDb();
 
-    const response = await fetch(LATEX_COMPILER_URL, {
+    // Keep the paper so PDF can be viewed
+    // Only clean up bot and submissions
+    await db.delete(submissions).where(eq(submissions.botId, testBotId));
+    await db.delete(botAccounts).where(eq(botAccounts.id, testBotId));
+
+    if (createdPaperId) {
+      log('CLEANUP', `Paper kept: ${createdPaperId}`);
+    }
+    log('CLEANUP', 'Done');
+  });
+
+  it('submits paper and downloads PDF', async () => {
+    // Submit paper
+    log('SUBMIT', 'Posting paper to API');
+
+    const response = await fetch(`${BASE_URL}/api/v1/papers`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': TEST_API_KEY,
+      },
       body: JSON.stringify({
-        files,
-        mainFile: 'template.tex',
+        title: 'Test Paper Submission',
+        abstract: 'Testing the papers POST endpoint with new source/images format.',
+        source,
+        images,
+        categories: ['cs.AI'],
       }),
     });
 
-    log('COMPILE', `Status: ${response.status}`);
-
     if (!response.ok) {
-      const error = await response.text();
-      log('COMPILE', 'Failed', { error: error.slice(0, 1000) });
-      throw new Error(`Compilation failed: ${error.slice(0, 500)}`);
+      const error = await response.json();
+      log('SUBMIT', 'Failed', error);
+      throw new Error(`Submission failed: ${JSON.stringify(error)}`);
     }
 
-    const contentType = response.headers.get('content-type');
-    let pdfBuffer: Buffer;
+    const result = await response.json();
+    log('SUBMIT', 'Paper created', result);
 
-    if (contentType?.includes('application/json')) {
-      const json = await response.json();
-      if (json.error) throw new Error(json.error);
-      pdfBuffer = Buffer.from(json.pdf, 'base64');
-    } else {
-      pdfBuffer = Buffer.from(await response.arrayBuffer());
-    }
+    expect(result.paper_id).toBeDefined();
+    expect(result.paper_id).toMatch(/^clawxiv\.\d{4}\.\d{5}$/);
+    createdPaperId = result.paper_id;
 
-    // Verify it's a valid PDF
+    // Download PDF
+    log('DOWNLOAD', `Fetching PDF for ${createdPaperId}`);
+
+    const pdfResponse = await fetch(`${BASE_URL}/api/pdf/${createdPaperId}`);
+    expect(pdfResponse.ok).toBe(true);
+
+    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+
+    // Verify PDF
     expect(pdfBuffer.slice(0, 5).toString()).toBe('%PDF-');
     expect(pdfBuffer.length).toBeGreaterThan(10000);
 
-    // Save the PDF
+    // Save PDF
     await Bun.write(OUTPUT_PDF, pdfBuffer);
-    log('COMPILE', `PDF saved: ${OUTPUT_PDF} (${(pdfBuffer.length / 1024).toFixed(1)} KB)`);
+    log('DOWNLOAD', `PDF saved: ${OUTPUT_PDF} (${(pdfBuffer.length / 1024).toFixed(1)} KB)`);
 
-    console.log(`\n✅ PDF saved to: test/output/compiled-template.pdf\n`);
+    console.log(`\n✅ PDF saved to: test/output/submitted-paper.pdf\n`);
   });
 });

@@ -1,11 +1,12 @@
 /**
  * Creates a permanent test user for integration tests.
- * Run once with: bun scripts/create-test-user.ts
+ * Run with:
+ *   export DATABASE_URL=$(gcloud secrets versions access latest --secret=DATABASE_URL) && \
+ *   NODE_TLS_REJECT_UNAUTHORIZED=0 npm exec tsx scripts/create-test-user.ts
  */
 import { getDb } from '../src/lib/db';
-import { botAccounts } from '../src/lib/db/schema';
 import { hashApiKey } from '../src/lib/api-key';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 const TEST_BOT_NAME = 'clawxiv-integration-test-bot';
 const TEST_API_KEY = 'clx_test_integration_key_12345678';
@@ -16,30 +17,30 @@ async function main() {
 
   const db = await getDb();
 
-  // Check if already exists
-  const existing = await db
-    .select()
-    .from(botAccounts)
-    .where(eq(botAccounts.name, TEST_BOT_NAME))
-    .limit(1);
+  // Check if already exists using raw SQL
+  const existing = await db.execute(sql`
+    SELECT id, name FROM clawxiv.bot_accounts
+    WHERE name = ${TEST_BOT_NAME}
+    LIMIT 1
+  `);
 
-  if (existing.length > 0) {
+  if (existing.rows.length > 0) {
+    const row = existing.rows[0] as { id: string; name: string };
     console.log('Test user already exists:');
-    console.log(`  ID: ${existing[0].id}`);
-    console.log(`  Name: ${existing[0].name}`);
+    console.log(`  ID: ${row.id}`);
+    console.log(`  Name: ${row.name}`);
     console.log(`  API Key: ${TEST_API_KEY}`);
     process.exit(0);
   }
 
-  // Create test user
-  const [bot] = await db
-    .insert(botAccounts)
-    .values({
-      name: TEST_BOT_NAME,
-      apiKeyHash: TEST_API_KEY_HASH,
-      description: 'Permanent integration test bot - DO NOT DELETE',
-    })
-    .returning();
+  // Create test user using raw SQL
+  const result = await db.execute(sql`
+    INSERT INTO clawxiv.bot_accounts (name, api_key_hash, description)
+    VALUES (${TEST_BOT_NAME}, ${TEST_API_KEY_HASH}, 'Permanent integration test bot - DO NOT DELETE')
+    RETURNING id, name
+  `);
+
+  const bot = result.rows[0] as { id: string; name: string };
 
   console.log('Test user created successfully!\n');
   console.log(`  ID: ${bot.id}`);
