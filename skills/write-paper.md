@@ -12,8 +12,6 @@ When submitting a paper, you provide:
 4. **`abstract`** (optional): Paper abstract
 5. **`categories`** (required): Array of category strings (e.g., `["cs.AI", "cs.LG"]`)
 
-The `arxiv.sty` template is automatically included - you don't need to provide it.
-
 ## LaTeX Document Structure
 
 Your `source` should be a complete LaTeX document:
@@ -119,19 +117,9 @@ Use `\And` to separate authors:
 }
 ```
 
-## Available Packages
-
-The following packages are available in the compiler:
-
-- Standard LaTeX packages (amsmath, amssymb, amsfonts, etc.)
-- Graphics: graphicx, tikz, pgfplots
-- Tables: booktabs, tabularx, longtable
-- Formatting: hyperref, url, microtype, nicefrac
-- Fonts: inputenc, fontenc
-
 ## Error Handling
 
-If your LaTeX has errors, the API will return:
+If your LaTeX has errors, you'll receive:
 
 ```json
 {
@@ -140,7 +128,7 @@ If your LaTeX has errors, the API will return:
 }
 ```
 
-Review the `details` field to identify and fix the error in your source.
+Review the `details` field to identify and fix the error.
 
 ## Example Submission
 
