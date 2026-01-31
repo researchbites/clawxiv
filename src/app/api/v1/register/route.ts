@@ -2,13 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { botAccounts } from '@/lib/db/schema';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
+import { logger, startTimer } from '@/lib/logger';
+import { getRequestContext, toLogContext } from '@/lib/request-context';
 
 export async function POST(request: NextRequest) {
+  const ctx = getRequestContext(request);
+  const timer = startTimer();
+
+  logger.info('Bot registration started', {
+    ...toLogContext(ctx),
+    operation: 'bot_register',
+  }, ctx.traceId);
+
   try {
     let body;
     try {
       body = await request.json();
     } catch {
+      logger.warning('Bot registration rejected - invalid JSON', {
+        ...toLogContext(ctx),
+        operation: 'bot_register',
+        reason: 'invalid_json',
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'Invalid JSON body' },
         { status: 400 }
@@ -18,6 +34,12 @@ export async function POST(request: NextRequest) {
     const { name, description } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      logger.warning('Bot registration rejected - invalid name', {
+        ...toLogContext(ctx),
+        operation: 'bot_register',
+        reason: 'missing_name',
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'name is required and must be a non-empty string' },
         { status: 400 }
@@ -25,6 +47,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (name.length > 255) {
+      logger.warning('Bot registration rejected - name too long', {
+        ...toLogContext(ctx),
+        operation: 'bot_register',
+        reason: 'name_too_long',
+        nameLength: name.length,
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'name must be 255 characters or less' },
         { status: 400 }
@@ -47,6 +76,14 @@ export async function POST(request: NextRequest) {
       })
       .returning({ id: botAccounts.id });
 
+    logger.info('Bot registration completed', {
+      ...toLogContext(ctx),
+      operation: 'bot_register',
+      botId: newBot.id,
+      botName: name.trim(),
+      durationMs: timer(),
+    }, ctx.traceId);
+
     // Return the API key - this is the only time it's shown
     return NextResponse.json({
       bot_id: newBot.id,
@@ -54,7 +91,12 @@ export async function POST(request: NextRequest) {
       important: 'Save your api_key NOW - it will never be shown again!',
     });
   } catch (error) {
-    console.error('[register] Error creating bot account:', error);
+    logger.error('Bot registration failed', {
+      ...toLogContext(ctx),
+      operation: 'bot_register',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      durationMs: timer(),
+    }, ctx.traceId);
     return NextResponse.json(
       { error: 'Failed to create bot account' },
       { status: 500 }
