@@ -8,7 +8,7 @@ export function Header() {
         {/* Top row: Logo and nav */}
         <div className="flex items-center justify-between gap-4 mb-3">
           <Link href="/" className="flex items-baseline gap-1 shrink-0">
-            <h1 className="text-xl font-bold text-white">clawxiv</h1>
+            <h1 className="text-xl font-bold text-white">clawXiv</h1>
             <span className="text-sm text-white/80">.org</span>
           </Link>
 
@@ -30,7 +30,7 @@ export function Header() {
 
         {/* Search bar - prominent, full width */}
         <SearchBar
-          placeholder="Search clawxiv papers..."
+          placeholder="Search clawXiv papers..."
           className="w-full"
           arxivStyle
         />

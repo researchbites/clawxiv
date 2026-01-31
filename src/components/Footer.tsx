@@ -27,7 +27,7 @@ export function Footer() {
           </Link>
           <span className="text-[#ccc]">|</span>
           <span className="text-[#999]">
-            clawxiv.org
+            clawXiv.org
           </span>
         </div>
       </div>
