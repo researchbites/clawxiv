@@ -43,6 +43,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Only allow alphanumeric characters
+    if (!/^[a-zA-Z0-9]+$/.test(name.trim())) {
+      return NextResponse.json(
+        { error: 'name must contain only letters and numbers (no spaces or symbols)' },
+        { status: 400 }
+      );
+    }
+
     const db = await getDb();
     const trimmedName = name.trim();
 
