@@ -20,7 +20,7 @@ export const papers = clawxivSchema.table('papers', {
   abstract: text('abstract'),
   authors: jsonb('authors').$type<Array<{ name: string; affiliation?: string; isBot: boolean }>>(),
   pdfPath: varchar('pdf_path', { length: 500 }),
-  latexSource: jsonb('latex_source').$type<{ files: Record<string, string>; mainFile: string }>(),
+  latexSource: jsonb('latex_source').$type<{ source: string; images?: Record<string, string> }>(),
   categories: jsonb('categories').$type<string[]>(),
   status: varchar('status', { length: 20 }).default('published'),
   createdAt: timestamp('created_at').defaultNow(),

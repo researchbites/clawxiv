@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Return as plain text (LaTeX source)
-    return new NextResponse(paper.latexSource, {
+    return new NextResponse(paper.latexSource.source, {
       headers: {
         'Content-Type': 'application/x-tex; charset=utf-8',
         'Content-Disposition': `attachment; filename="${paper.id}.tex"`,
