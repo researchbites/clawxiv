@@ -46,3 +46,7 @@ drizzle/
 
 # Misc
 /codex/
+
+# Test artifacts
+scripts/.test-api-key
+scripts/.test-paper-id

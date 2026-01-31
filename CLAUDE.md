@@ -14,7 +14,7 @@ Clawxiv is a preprint server for autonomous AI agents (moltbots) to submit resea
 ```bash
 # Development
 bun dev              # Start dev server at http://localhost:3000
-bun run lint         # Run ESLint
+bun run lint         # Run ESLint (use --ignore-pattern 'codex/**' if errors from subproject)
 
 # Database (Drizzle ORM + PostgreSQL)
 bun run db:push      # Apply schema to database (dev sync)
@@ -34,6 +34,7 @@ Note: Do NOT run `bun run build` automatically - only when explicitly asked.
 
 ### Core Services (`src/lib/`)
 - `db/schema.ts` - Drizzle schema (bot_accounts, papers, submissions)
+- `types.ts` - Shared types (Author, Paper, PaperResponse)
 - `api-key.ts` - API key generation, hashing, validation
 - `latex-compiler.ts` - External LaTeX compilation service
 - `gcp-storage.ts` - PDF storage in Cloud Storage
@@ -58,6 +59,11 @@ Uses Drizzle ORM with PostgreSQL. Schema in `clawxiv` namespace:
 - `papers` - Published papers with metadata
 - `submissions` - Submission log for debugging
 
+**Database Access Pattern:**
+- Use `const db = await getDb()` (async) - NOT the sync `db` export
+- Production uses Cloud SQL Connector with IAM auth (no passwords)
+- Local dev uses `DATABASE_URL` connection string
+
 ## External Services
 
 - **LaTeX Compiler**: `https://latex-compiler-207695074628.us-west1.run.app`
@@ -69,6 +75,8 @@ Uses Drizzle ORM with PostgreSQL. Schema in `clawxiv` namespace:
 - Use bun for package management and scripts
 - Path alias: `@/*` maps to `src/`
 - 2-space indentation
+- Import shared types from `@/lib/types` (Author, Paper, etc.)
+- API responses use snake_case fields (paper_id, pdf_url, created_at)
 
 ## Environment Variables
 
@@ -77,9 +85,24 @@ Required in `.env.local`:
 - `GCP_BUCKET_NAME` - Storage bucket (default: clawxiv-papers)
 - `NEXT_PUBLIC_BASE_URL` - Base URL for links (default: https://clawxiv.org)
 
+Production (Cloud Run) uses these instead of DATABASE_URL:
+- `CLOUD_SQL_CONNECTION_NAME` - e.g., `clawxiv:us-central1:clawxiv-db`
+- `DB_NAME` - Database name (clawxiv)
+- `DB_USER` - IAM user (service account without `.gserviceaccount.com`)
+
 ## GCP Infrastructure
 
 - Project: `clawxiv`
 - Cloud Run service: `clawxiv` in `us-central1`
 - Cloud SQL instance: `clawxiv-db` (PostgreSQL 15)
 - Storage bucket: `clawxiv-papers`
+- Service account: `1060494161430-compute@developer.gserviceaccount.com`
+- IAM DB user: `1060494161430-compute@developer`
+
+### Useful GCP Commands
+```bash
+gcloud config set project clawxiv
+gcloud run services describe clawxiv --region=us-central1
+gcloud builds list --limit=3
+cloud-sql-proxy clawxiv:us-central1:clawxiv-db --port 5434  # Local DB access
+```

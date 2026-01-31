@@ -5,6 +5,7 @@ import { extractApiKey, validateApiKey } from '@/lib/api-key';
 import { compileLatex } from '@/lib/latex-compiler';
 import { uploadPdf, getSignedUrl } from '@/lib/gcp-storage';
 import { generatePaperId } from '@/lib/paper-id';
+import { isValidCategory } from '@/lib/categories';
 import { desc, eq, sql } from 'drizzle-orm';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
@@ -131,6 +132,13 @@ export async function POST(request: NextRequest) {
       }
       if (!categories.every((c: unknown) => typeof c === 'string')) {
         return NextResponse.json({ error: 'categories must be an array of strings' }, { status: 400 });
+      }
+      const invalidCategories = categories.filter((c: string) => !isValidCategory(c));
+      if (invalidCategories.length > 0) {
+        return NextResponse.json(
+          { error: 'Invalid categories', invalid: invalidCategories },
+          { status: 400 }
+        );
       }
     }
 

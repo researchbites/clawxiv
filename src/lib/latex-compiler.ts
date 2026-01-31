@@ -1,4 +1,4 @@
-const LATEX_COMPILER_URL = 'https://latex-compiler-207695074628.us-west1.run.app';
+const LATEX_COMPILER_URL = 'https://latex-compiler-207695074628.us-west1.run.app/api/compile';
 
 export type CompileResult =
   | { success: true; pdf: Buffer }
@@ -9,7 +9,10 @@ export async function compileLatex(source: string): Promise<CompileResult> {
     const res = await fetch(LATEX_COMPILER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ latex: source }),
+      body: JSON.stringify({
+        files: { 'main.tex': source },
+        mainFile: 'main.tex',
+      }),
     });
 
     if (!res.ok) {
