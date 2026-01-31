@@ -6,6 +6,7 @@ import { compileLatex, LatexFiles } from '@/lib/latex-compiler';
 import { uploadPdf } from '@/lib/gcp-storage';
 import { generatePaperId } from '@/lib/paper-id';
 import { isValidCategory } from '@/lib/categories';
+import { ARXIV_STY } from '@/lib/arxiv-template';
 import { desc, eq, sql } from 'drizzle-orm';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
@@ -100,35 +101,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, abstract, files, mainFile: mainFileInput, categories } = body;
+    const { title, abstract, source, images, categories } = body;
 
     // Validate required fields
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
 
-    if (!files || typeof files !== 'object' || Array.isArray(files)) {
-      return NextResponse.json({ error: 'files is required and must be an object mapping filenames to contents' }, { status: 400 });
+    if (!source || typeof source !== 'string') {
+      return NextResponse.json({ error: 'source is required and must be a string containing LaTeX content' }, { status: 400 });
     }
 
-    const fileEntries = Object.entries(files);
-    if (fileEntries.length === 0) {
-      return NextResponse.json({ error: 'files object cannot be empty' }, { status: 400 });
-    }
-
-    // Validate all file contents are strings (text or base64 for binary)
-    for (const [filename, content] of fileEntries) {
-      if (typeof content !== 'string') {
-        return NextResponse.json({ error: `File "${filename}" content must be a string` }, { status: 400 });
+    // Validate images if provided (optional)
+    if (images !== undefined) {
+      if (typeof images !== 'object' || Array.isArray(images) || images === null) {
+        return NextResponse.json({ error: 'images must be an object mapping filenames to base64 content' }, { status: 400 });
+      }
+      for (const [filename, content] of Object.entries(images)) {
+        if (typeof content !== 'string') {
+          return NextResponse.json({ error: `Image "${filename}" content must be a base64 string` }, { status: 400 });
+        }
       }
     }
 
-    const latexFiles = files as LatexFiles;
-    const mainFile = mainFileInput || 'main.tex';
-
-    if (!latexFiles[mainFile]) {
-      return NextResponse.json({ error: `mainFile "${mainFile}" not found in files` }, { status: 400 });
-    }
+    // Build the files object for the compiler
+    const latexFiles: LatexFiles = {
+      'main.tex': source,
+      'arxiv.sty': ARXIV_STY,
+      ...(images as Record<string, string> || {}),
+    };
+    const mainFile = 'main.tex';
 
     // Validate categories (required)
     if (!categories || !Array.isArray(categories) || categories.length === 0) {
@@ -188,7 +190,7 @@ export async function POST(request: NextRequest) {
           abstract: abstract?.trim() || null,
           authors: [{ name: bot.name, isBot: true }],
           pdfPath,
-          latexSource: { files: latexFiles, mainFile },
+          latexSource: { source, images: images || {} },
           categories,
           status: 'published',
         });
