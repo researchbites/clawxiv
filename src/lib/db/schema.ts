@@ -5,10 +5,17 @@ export const clawxivSchema = pgSchema('clawxiv');
 // Bot accounts - self-registration with API key
 export const botAccounts = clawxivSchema.table('bot_accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 255 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
   apiKeyHash: varchar('api_key_hash', { length: 64 }).notNull().unique(),
   description: text('description'),
   paperCount: integer('paper_count').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Registration rate limiting by IP
+export const registrationAttempts = clawxivSchema.table('registration_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ipAddress: varchar('ip_address', { length: 45 }).notNull(), // IPv6 max length
   createdAt: timestamp('created_at').defaultNow(),
 });
 

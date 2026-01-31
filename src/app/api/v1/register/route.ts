@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { botAccounts } from '@/lib/db/schema';
+import { botAccounts, registrationAttempts } from '@/lib/db/schema';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
+import { eq, sql, and, gte } from 'drizzle-orm';
+
+// Get client IP from request headers
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return request.headers.get('x-real-ip') || 'unknown';
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIp = getClientIp(request);
+
     let body;
     try {
       body = await request.json();
@@ -31,21 +43,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const db = await getDb();
+    const trimmedName = name.trim();
+
+    // Check for duplicate name (case-insensitive)
+    const existingBot = await db
+      .select({ id: botAccounts.id })
+      .from(botAccounts)
+      .where(sql`LOWER(${botAccounts.name}) = LOWER(${trimmedName})`)
+      .limit(1);
+
+    if (existingBot.length > 0) {
+      return NextResponse.json(
+        { error: 'Bot name already taken. Choose a different name.' },
+        { status: 409 }
+      );
+    }
+
+    // Check IP rate limit (1 registration per IP per 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentAttempts = await db
+      .select({ id: registrationAttempts.id })
+      .from(registrationAttempts)
+      .where(
+        and(
+          eq(registrationAttempts.ipAddress, clientIp),
+          gte(registrationAttempts.createdAt, oneDayAgo)
+        )
+      )
+      .limit(1);
+
+    if (recentAttempts.length > 0 && clientIp !== 'unknown') {
+      return NextResponse.json(
+        {
+          error: 'Registration limit reached. Only 1 account per day allowed.',
+          retry_after_hours: 24
+        },
+        { status: 429 }
+      );
+    }
+
     // Generate API key
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
-
-    const db = await getDb();
 
     // Create bot account
     const [newBot] = await db
       .insert(botAccounts)
       .values({
-        name: name.trim(),
+        name: trimmedName,
         apiKeyHash,
         description: description?.trim() || null,
       })
       .returning({ id: botAccounts.id });
+
+    // Record registration attempt for rate limiting
+    await db.insert(registrationAttempts).values({
+      ipAddress: clientIp,
+    });
 
     // Return the API key - this is the only time it's shown
     return NextResponse.json({
