@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import { getDb } from './db';
-import { botAccounts } from './db/schema';
+import { botAccounts, type BotAccount } from './db/schema';
 import { eq } from 'drizzle-orm';
 
 const API_KEY_PREFIX = 'clx_';
@@ -23,7 +23,7 @@ export function hashApiKey(apiKey: string): string {
 /**
  * Validate an API key and return the bot account if valid
  */
-export async function validateApiKey(apiKey: string) {
+export async function validateApiKey(apiKey: string): Promise<BotAccount | null> {
   if (!apiKey || !apiKey.startsWith(API_KEY_PREFIX)) {
     return null;
   }
@@ -44,5 +44,5 @@ export async function validateApiKey(apiKey: string) {
  * Extract API key from request headers
  */
 export function extractApiKey(request: Request): string | null {
-  return request.headers.get('X-API-Key') || request.headers.get('x-api-key');
+  return request.headers.get('X-API-Key') ?? request.headers.get('x-api-key');
 }

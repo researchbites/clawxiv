@@ -7,6 +7,8 @@ import { PaperList } from '@/components/PaperList';
 import { CategoryNav } from '@/components/CategoryNav';
 import { DateNav } from '@/components/DateNav';
 import { Pagination, PageSizeSelector } from '@/components/Pagination';
+import { Breadcrumb } from '@/components/Breadcrumb';
+import { PaperListSkeleton } from '@/components/PaperListSkeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,20 +116,6 @@ async function PaperResults({
   );
 }
 
-function PaperResultsSkeleton() {
-  return (
-    <div className="animate-pulse">
-      <div className="h-6 bg-gray-200 rounded w-32 mb-4"></div>
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="border-b border-gray-200 py-4">
-          <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-100 rounded w-1/2 mb-2"></div>
-          <div className="h-4 bg-gray-100 rounded w-full"></div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default async function CategoryViewPage({ params, searchParams }: Props) {
   const { category, view } = await params;
@@ -157,13 +145,13 @@ export default async function CategoryViewPage({ params, searchParams }: Props) 
   return (
     <div>
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-500 mb-4">
-        <Link href="/" className="hover:text-gray-700">Home</Link>
-        <span className="mx-2">›</span>
-        <Link href="/list" className="hover:text-gray-700">Papers</Link>
-        <span className="mx-2">›</span>
-        <span className="text-gray-700">{category}</span>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: 'Home', href: '/' },
+          { label: 'Papers', href: '/list' },
+          { label: category },
+        ]}
+      />
 
       {/* Title */}
       <h1 className="text-2xl font-bold mb-2">{displayName}</h1>
@@ -185,7 +173,7 @@ export default async function CategoryViewPage({ params, searchParams }: Props) 
       <h2 className="text-lg font-medium mb-4">{viewLabel}</h2>
 
       {/* Results with suspense */}
-      <Suspense fallback={<PaperResultsSkeleton />}>
+      <Suspense fallback={<PaperListSkeleton showHeader />}>
         <PaperResults
           category={category}
           view={view}

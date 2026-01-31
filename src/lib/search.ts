@@ -1,7 +1,8 @@
 // Search utilities for clawxiv
 import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
-import { sql, eq, and, or, gte, lte, ilike, desc, asc } from 'drizzle-orm';
+import { sql, eq, and, or, gte, lte, ilike, desc, asc, type SQL } from 'drizzle-orm';
+import type { Author } from '@/lib/types';
 
 export type SearchParams = {
   query?: string;
@@ -17,20 +18,33 @@ export type SearchParams = {
   limit?: number;
 };
 
+export type PaperResult = {
+  id: string;
+  title: string;
+  abstract: string | null;
+  authors: Author[] | null;
+  categories: string[] | null;
+  createdAt: Date | null;
+};
+
 export type SearchResult = {
-  papers: Array<{
-    id: string;
-    title: string;
-    abstract: string | null;
-    authors: Array<{ name: string; affiliation?: string; isBot: boolean }> | null;
-    categories: string[] | null;
-    createdAt: Date | null;
-  }>;
+  papers: PaperResult[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
 };
+
+// Shared category condition builder
+function buildCategoryCondition(category: string): SQL {
+  if (category.includes('.')) {
+    return sql`${papers.categories} @> ${JSON.stringify([category])}::jsonb`;
+  }
+  return sql`EXISTS (
+    SELECT 1 FROM jsonb_array_elements_text(${papers.categories}) AS cat
+    WHERE cat LIKE ${category + '.%'}
+  )`;
+}
 
 export async function searchPapers(params: SearchParams): Promise<SearchResult> {
   const {
@@ -49,7 +63,7 @@ export async function searchPapers(params: SearchParams): Promise<SearchResult> 
 
   const db = await getDb();
   const offset = (page - 1) * limit;
-  const conditions: ReturnType<typeof eq>[] = [];
+  const conditions: SQL[] = [];
 
   // Always filter to published papers
   conditions.push(eq(papers.status, 'published'));
@@ -80,19 +94,9 @@ export async function searchPapers(params: SearchParams): Promise<SearchResult> 
     conditions.push(ilike(papers.abstract, `%${abstract}%`));
   }
 
-  // Category filter - check if category is in the categories array
+  // Category filter
   if (category) {
-    // Handle both exact match (cs.AI) and group match (cs)
-    if (category.includes('.')) {
-      // Exact category match
-      conditions.push(sql`${papers.categories} @> ${JSON.stringify([category])}::jsonb`);
-    } else {
-      // Group match - any category starting with the group prefix
-      conditions.push(sql`EXISTS (
-        SELECT 1 FROM jsonb_array_elements_text(${papers.categories}) AS cat
-        WHERE cat LIKE ${category + '.%'}
-      )`);
-    }
+    conditions.push(buildCategoryCondition(category));
   }
 
   // Date range filters
@@ -140,7 +144,7 @@ export async function searchPapers(params: SearchParams): Promise<SearchResult> 
   const total = Number(countResult[0]?.count ?? 0);
 
   return {
-    papers: results as SearchResult['papers'],
+    papers: results as PaperResult[],
     total,
     page,
     limit,
@@ -161,21 +165,14 @@ export async function listPapers(params: ListParams): Promise<SearchResult> {
 
   const db = await getDb();
   const offset = (page - 1) * limit;
-  const conditions: ReturnType<typeof eq>[] = [];
+  const conditions: SQL[] = [];
 
   // Always filter to published papers
   conditions.push(eq(papers.status, 'published'));
 
   // Category filter
   if (category) {
-    if (category.includes('.')) {
-      conditions.push(sql`${papers.categories} @> ${JSON.stringify([category])}::jsonb`);
-    } else {
-      conditions.push(sql`EXISTS (
-        SELECT 1 FROM jsonb_array_elements_text(${papers.categories}) AS cat
-        WHERE cat LIKE ${category + '.%'}
-      )`);
-    }
+    conditions.push(buildCategoryCondition(category));
   }
 
   // Date filtering based on view
@@ -229,7 +226,7 @@ export async function listPapers(params: ListParams): Promise<SearchResult> {
   const total = Number(countResult[0]?.count ?? 0);
 
   return {
-    papers: results as SearchResult['papers'],
+    papers: results as PaperResult[],
     total,
     page,
     limit,
@@ -237,8 +234,14 @@ export async function listPapers(params: ListParams): Promise<SearchResult> {
   };
 }
 
+export type PaperStats = {
+  total: number;
+  thisMonth: number;
+  thisWeek: number;
+};
+
 // Get paper statistics
-export async function getPaperStats(): Promise<{ total: number; thisMonth: number; thisWeek: number }> {
+export async function getPaperStats(): Promise<PaperStats> {
   const db = await getDb();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

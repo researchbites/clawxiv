@@ -92,7 +92,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 }
+      );
+    }
+
     const { title, abstract, authors, latex_source, categories } = body;
 
     // Validate required fields
@@ -101,6 +110,28 @@ export async function POST(request: NextRequest) {
     }
     if (!latex_source || typeof latex_source !== 'string') {
       return NextResponse.json({ error: 'latex_source is required' }, { status: 400 });
+    }
+
+    // Validate authors array structure
+    if (authors !== undefined) {
+      if (!Array.isArray(authors)) {
+        return NextResponse.json({ error: 'authors must be an array' }, { status: 400 });
+      }
+      for (const author of authors) {
+        if (typeof author !== 'object' || !author.name || typeof author.name !== 'string') {
+          return NextResponse.json({ error: 'Each author must have a name string' }, { status: 400 });
+        }
+      }
+    }
+
+    // Validate categories array structure
+    if (categories !== undefined) {
+      if (!Array.isArray(categories)) {
+        return NextResponse.json({ error: 'categories must be an array' }, { status: 400 });
+      }
+      if (!categories.every((c: unknown) => typeof c === 'string')) {
+        return NextResponse.json({ error: 'categories must be an array of strings' }, { status: 400 });
+      }
     }
 
     const db = await getDb();
@@ -114,62 +145,83 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Compile LaTeX
-    const compileResult = await compileLatex(latex_source);
+    try {
+      // Compile LaTeX
+      const compileResult = await compileLatex(latex_source);
 
-    if (!compileResult.success) {
+      if (!compileResult.success) {
+        await db
+          .update(submissions)
+          .set({ status: 'failed', errorMessage: compileResult.error })
+          .where(eq(submissions.id, submission.id));
+
+        return NextResponse.json(
+          { error: 'LaTeX compilation failed', details: compileResult.error },
+          { status: 400 }
+        );
+      }
+
+      // Generate paper ID
+      const paperId = await generatePaperId();
+
+      // Upload PDF to GCP
+      const pdfPath = await uploadPdf(compileResult.pdf, paperId);
+
+      // Create paper record
       await db
-        .update(submissions)
-        .set({ status: 'failed', errorMessage: compileResult.error })
-        .where(eq(submissions.id, submission.id));
+        .insert(papers)
+        .values({
+          id: paperId,
+          botId: bot.id,
+          title: title.trim(),
+          abstract: abstract?.trim() || null,
+          authors: authors || [{ name: bot.name, isBot: true }],
+          pdfPath,
+          latexSource: latex_source,
+          categories: categories || [],
+          status: 'published',
+        });
+
+      // Update submission and bot paper count
+      await Promise.all([
+        db
+          .update(submissions)
+          .set({ status: 'published', paperId })
+          .where(eq(submissions.id, submission.id)),
+        db
+          .update(botAccounts)
+          .set({ paperCount: sql`${botAccounts.paperCount} + 1` })
+          .where(eq(botAccounts.id, bot.id)),
+      ]);
+
+      // Get signed URL for response
+      const pdfUrl = await getSignedUrl(pdfPath);
+
+      return NextResponse.json({
+        paper_id: paperId,
+        url: `${BASE_URL}/abs/${paperId}`,
+        pdf_url: pdfUrl,
+      });
+    } catch (error) {
+      console.error('[papers] Error during paper processing:', error);
+
+      // Update submission status to failed
+      try {
+        await db.update(submissions)
+          .set({
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error'
+          })
+          .where(eq(submissions.id, submission.id));
+      } catch (updateError) {
+        console.error('[papers] Failed to update submission status:', updateError);
+      }
 
       return NextResponse.json(
-        { error: 'LaTeX compilation failed', details: compileResult.error },
-        { status: 400 }
+        { error: 'Failed to submit paper' },
+        { status: 500 }
       );
     }
-
-    // Generate paper ID
-    const paperId = await generatePaperId();
-
-    // Upload PDF to GCP
-    const pdfPath = await uploadPdf(compileResult.pdf, paperId);
-
-    // Create paper record
-    await db
-      .insert(papers)
-      .values({
-        id: paperId,
-        botId: bot.id,
-        title: title.trim(),
-        abstract: abstract?.trim() || null,
-        authors: authors || [{ name: bot.name, isBot: true }],
-        pdfPath,
-        latexSource: latex_source,
-        categories: categories || [],
-        status: 'published',
-      });
-
-    // Update submission and bot paper count
-    await Promise.all([
-      db
-        .update(submissions)
-        .set({ status: 'published', paperId })
-        .where(eq(submissions.id, submission.id)),
-      db
-        .update(botAccounts)
-        .set({ paperCount: sql`${botAccounts.paperCount} + 1` })
-        .where(eq(botAccounts.id, bot.id)),
-    ]);
-
-    // Get signed URL for response
-    const pdfUrl = await getSignedUrl(pdfPath);
-
-    return NextResponse.json({
-      paper_id: paperId,
-      url: `${BASE_URL}/abs/${paperId}`,
-      pdf_url: pdfUrl,
-    });
   } catch (error) {
     console.error('[papers] Error submitting paper:', error);
     return NextResponse.json(

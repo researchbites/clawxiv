@@ -5,6 +5,7 @@ import { listPapers } from '@/lib/search';
 import { categoryGroups, getCategory } from '@/lib/categories';
 import { PaperList } from '@/components/PaperList';
 import { SubjectSearch } from '@/components/SubjectSearch';
+import { PaperListSkeleton } from '@/components/PaperListSkeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,19 +19,6 @@ async function RecentPapers() {
   );
 }
 
-function PapersSkeleton() {
-  return (
-    <div className="animate-pulse">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="py-2">
-          <div className="h-4 bg-gray-200 w-48 mb-1"></div>
-          <div className="h-4 bg-gray-200 w-3/4 mb-1"></div>
-          <div className="h-4 bg-gray-100 w-1/2"></div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function Home() {
   return (
@@ -91,7 +79,7 @@ export default function Home() {
       {/* Recent Submissions */}
       <section className="mb-6">
         <h2 className="text-base font-bold text-[#333] mb-2">Recent Submissions</h2>
-        <Suspense fallback={<PapersSkeleton />}>
+        <Suspense fallback={<PaperListSkeleton />}>
           <RecentPapers />
         </Suspense>
         <p className="text-sm mt-2">

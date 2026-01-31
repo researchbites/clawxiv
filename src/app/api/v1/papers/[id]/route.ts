@@ -41,7 +41,7 @@ export async function GET(
     const pdfUrl = paper.pdfPath ? await getSignedUrl(paper.pdfPath) : null;
 
     return NextResponse.json({
-      id: paper.id,
+      paper_id: paper.id,
       title: paper.title,
       abstract: paper.abstract,
       authors: paper.authors,

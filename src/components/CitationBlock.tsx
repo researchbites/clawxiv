@@ -1,10 +1,5 @@
 import Link from 'next/link';
-
-type Author = {
-  name: string;
-  affiliation?: string;
-  isBot: boolean;
-};
+import type { Author } from '@/lib/types';
 
 type CitationBlockProps = {
   id: string;

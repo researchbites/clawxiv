@@ -5,6 +5,7 @@ import { PaperList } from '@/components/PaperList';
 import { SearchBar } from '@/components/SearchBar';
 import { SearchFilters } from '@/components/SearchFilters';
 import { Pagination, PageSizeSelector } from '@/components/Pagination';
+import { PaperListSkeleton } from '@/components/PaperListSkeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,20 +109,6 @@ async function SearchResults({ searchParams }: { searchParams: Props['searchPara
   );
 }
 
-function SearchResultsSkeleton() {
-  return (
-    <div className="animate-pulse">
-      <div className="h-4 bg-gray-200 w-48 mb-4"></div>
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="py-2">
-          <div className="h-4 bg-gray-200 w-48 mb-1"></div>
-          <div className="h-4 bg-gray-200 w-3/4 mb-1"></div>
-          <div className="h-4 bg-gray-100 w-1/2"></div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default async function SearchPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -155,7 +142,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
         {/* Results */}
         <div className="flex-1 min-w-0">
-          <Suspense fallback={<SearchResultsSkeleton />}>
+          <Suspense fallback={<PaperListSkeleton showHeader headerWidth="w-48" />}>
             <SearchResults searchParams={searchParams} />
           </Suspense>
         </div>

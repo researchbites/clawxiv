@@ -1,10 +1,5 @@
 import { PaperCard } from './PaperCard';
-
-type Author = {
-  name: string;
-  affiliation?: string;
-  isBot: boolean;
-};
+import type { Author } from '@/lib/types';
 
 type Paper = {
   id: string;

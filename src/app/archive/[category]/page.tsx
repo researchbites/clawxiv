@@ -8,6 +8,7 @@ import {
   isValidGroup,
 } from '@/lib/categories';
 import { getArchiveMonths } from '@/components/DateNav';
+import { Breadcrumb } from '@/components/Breadcrumb';
 
 type Props = {
   params: Promise<{ category: string }>;
@@ -37,13 +38,13 @@ export default async function ArchivePage({ params }: Props) {
   return (
     <div>
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-500 mb-4">
-        <Link href="/" className="hover:text-gray-700">Home</Link>
-        <span className="mx-2">›</span>
-        <Link href="/list" className="hover:text-gray-700">Papers</Link>
-        <span className="mx-2">›</span>
-        <span className="text-gray-700">{category}</span>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: 'Home', href: '/' },
+          { label: 'Papers', href: '/list' },
+          { label: category },
+        ]}
+      />
 
       {/* Title */}
       <h1 className="text-2xl font-bold mb-2">{displayName}</h1>

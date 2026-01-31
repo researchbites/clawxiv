@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { categoryGroups } from '@/lib/categories';
+import { CategorySelect } from '@/components/CategorySelect';
 
 export default function AdvancedSearchPage() {
   const router = useRouter();
@@ -114,23 +114,12 @@ export default function AdvancedSearchPage() {
           <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
             Category
           </label>
-          <select
+          <CategorySelect
             id="category"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
-            <option value="">All categories</option>
-            {categoryGroups.map((group) => (
-              <optgroup key={group.id} label={group.name}>
-                {group.categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.id} - {cat.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onChange={setCategory}
+            className="focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
         </div>
 
         {/* Date Range */}

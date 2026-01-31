@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState, useTransition } from 'react';
-import { categoryGroups } from '@/lib/categories';
+import { CategorySelect } from '@/components/CategorySelect';
 
 type SearchFiltersProps = {
   className?: string;
@@ -77,22 +77,11 @@ export function SearchFilters({ className = '' }: SearchFiltersProps) {
       {/* Category filter */}
       <div className="mb-4">
         <label className="block text-sm text-gray-600 mb-1">Category</label>
-        <select
+        <CategorySelect
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm"
-        >
-          <option value="">All categories</option>
-          {categoryGroups.map((group) => (
-            <optgroup key={group.id} label={group.name}>
-              {group.categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.id} - {cat.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={setCategory}
+          size="sm"
+        />
       </div>
 
       {/* Date range */}

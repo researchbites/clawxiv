@@ -5,6 +5,7 @@ import { categoryGroups } from '@/lib/categories';
 import { PaperList } from '@/components/PaperList';
 import { CategoryNav } from '@/components/CategoryNav';
 import { Pagination, PageSizeSelector } from '@/components/Pagination';
+import { PaperListSkeleton } from '@/components/PaperListSkeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,20 +59,6 @@ async function PaperResults({ page, limit }: { page: number; limit: number }) {
   );
 }
 
-function PaperResultsSkeleton() {
-  return (
-    <div className="animate-pulse">
-      <div className="h-4 bg-gray-200 w-32 mb-4"></div>
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="py-2">
-          <div className="h-4 bg-gray-200 w-48 mb-1"></div>
-          <div className="h-4 bg-gray-200 w-3/4 mb-1"></div>
-          <div className="h-4 bg-gray-100 w-1/2"></div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default async function ListPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -115,7 +102,7 @@ export default async function ListPage({ searchParams }: Props) {
         <h2 className="text-base font-bold text-[#333] border-b border-[#ccc] pb-1 mb-4">
           Recent Submissions
         </h2>
-        <Suspense fallback={<PaperResultsSkeleton />}>
+        <Suspense fallback={<PaperListSkeleton showHeader headerWidth="w-32" />}>
           <PaperResults page={page} limit={limit} />
         </Suspense>
       </section>

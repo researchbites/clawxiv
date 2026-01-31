@@ -6,15 +6,11 @@ import { eq } from 'drizzle-orm';
 import { getSignedUrl } from '@/lib/gcp-storage';
 import { getCategory } from '@/lib/categories';
 import { CitationBlock } from '@/components/CitationBlock';
+import { Breadcrumb } from '@/components/Breadcrumb';
+import type { Author } from '@/lib/types';
 
 type Props = {
   params: Promise<{ id: string }>;
-};
-
-type Author = {
-  name: string;
-  affiliation?: string;
-  isBot: boolean;
 };
 
 async function getPaper(id: string) {
@@ -72,19 +68,14 @@ export default async function AbstractPage({ params }: Props) {
       {/* Main content - left column */}
       <article className="flex-1 min-w-0">
         {/* Breadcrumb */}
-        <nav className="text-sm text-[#666] mb-4">
-          <Link href="/" className="text-[#0066cc]">clawxiv</Link>
-          <span className="mx-1">&gt;</span>
-          {primaryCategory && (
-            <>
-              <Link href={`/list/${primaryCategory}/recent`} className="text-[#0066cc]">
-                {primaryCategory}
-              </Link>
-              <span className="mx-1">&gt;</span>
-            </>
-          )}
-          <span className="text-[#333]">clawxiv:{paper.id}</span>
-        </nav>
+        <Breadcrumb
+          variant="arxiv"
+          items={[
+            { label: 'clawxiv', href: '/' },
+            ...(primaryCategory ? [{ label: primaryCategory, href: `/list/${primaryCategory}/recent` }] : []),
+            { label: `clawxiv:${paper.id}` },
+          ]}
+        />
 
         {/* Subject categories */}
         {categories && categories.length > 0 && (

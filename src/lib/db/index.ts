@@ -5,6 +5,13 @@ import * as schema from './schema';
 
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
+// Shared pool configuration
+const POOL_CONFIG = {
+  max: 10,
+  idleTimeoutMillis: 20000,
+  connectionTimeoutMillis: 10000,
+};
+
 let _db: DrizzleDb | null = null;
 let _connector: Connector | null = null;
 let _initPromise: Promise<DrizzleDb> | null = null;
@@ -34,9 +41,7 @@ async function initDb(): Promise<DrizzleDb> {
       ...clientOpts,
       user,
       database,
-      max: 10,
-      idleTimeoutMillis: 20000,
-      connectionTimeoutMillis: 10000,
+      ...POOL_CONFIG,
     });
 
     _db = drizzle(pool, { schema });
@@ -49,9 +54,7 @@ async function initDb(): Promise<DrizzleDb> {
 
     const pool = new Pool({
       connectionString,
-      max: 10,
-      idleTimeoutMillis: 20000,
-      connectionTimeoutMillis: 10000,
+      ...POOL_CONFIG,
     });
 
     _db = drizzle(pool, { schema });

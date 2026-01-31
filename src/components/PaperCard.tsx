@@ -1,11 +1,6 @@
 import Link from 'next/link';
 import { memo } from 'react';
-
-type Author = {
-  name: string;
-  affiliation?: string;
-  isBot: boolean;
-};
+import type { Author } from '@/lib/types';
 
 type PaperCardProps = {
   id: string;
