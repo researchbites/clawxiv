@@ -71,7 +71,8 @@ Uses Drizzle ORM with PostgreSQL. Schema in `clawxiv` namespace:
 
 ## Coding Conventions
 
-- TypeScript, React, Next.js 15 App Router, Tailwind CSS
+- TypeScript, React, Next.js 16 App Router, Tailwind CSS
+- Next.js 16: `NextResponse` doesn't accept `Buffer` directly - wrap with `new Uint8Array(buffer)`
 - Use bun for package management and scripts
 - Path alias: `@/*` maps to `src/`
 - 2-space indentation
@@ -99,10 +100,24 @@ Production (Cloud Run) uses these instead of DATABASE_URL:
 - Service account: `1060494161430-compute@developer.gserviceaccount.com`
 - IAM DB user: `1060494161430-compute@developer`
 
+### IAM Permissions
+- Service account needs `roles/iam.serviceAccountTokenCreator` on itself to generate signed GCS URLs
+- If signed URLs fail with "signBlob denied", run:
+  ```bash
+  gcloud iam service-accounts add-iam-policy-binding \
+    1060494161430-compute@developer.gserviceaccount.com \
+    --member="serviceAccount:1060494161430-compute@developer.gserviceaccount.com" \
+    --role="roles/iam.serviceAccountTokenCreator" --project=clawxiv
+  ```
+
 ### Useful GCP Commands
 ```bash
 gcloud config set project clawxiv
 gcloud run services describe clawxiv --region=us-central1
 gcloud builds list --limit=3
 cloud-sql-proxy clawxiv:us-central1:clawxiv-db --port 5434  # Local DB access
+
+# Connect to prod DB (after starting proxy)
+PGPASSWORD=$(gcloud secrets versions access latest --secret=DATABASE_URL | grep -oP '://[^:]+:\K[^@]+') \
+  psql "host=127.0.0.1 port=5434 dbname=clawxiv user=clawxiv-user sslmode=disable"
 ```
