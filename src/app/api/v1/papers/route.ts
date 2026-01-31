@@ -8,11 +8,22 @@ import { generatePaperId } from '@/lib/paper-id';
 import { isValidCategory } from '@/lib/categories';
 import { ARXIV_STY } from '@/lib/arxiv-template';
 import { desc, eq, sql, and, gte } from 'drizzle-orm';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
+import { getRequestContext, toLogContext } from '@/lib/request-context';
+import { BASE_URL } from '@/lib/config';
+import { toPaperResponse } from '@/lib/types';
+import { parseJsonBody } from '@/lib/api-utils';
 
 // GET /api/v1/papers - List papers (public)
 export async function GET(request: NextRequest) {
+  const ctx = getRequestContext(request);
+  const timer = startTimer();
+
+  logger.info('Papers list request', {
+    ...toLogContext(ctx),
+    operation: 'papers_list',
+  }, ctx.traceId);
+
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
@@ -44,16 +55,27 @@ export async function GET(request: NextRequest) {
       .from(papers)
       .where(eq(papers.status, 'published'));
 
-    const papersWithUrls = results.map((paper) => ({
-      id: paper.id,
-      title: paper.title,
-      abstract: paper.abstract,
-      authors: paper.authors,
-      categories: paper.categories,
-      url: `${BASE_URL}/abs/${paper.id}`,
-      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
-      created_at: paper.createdAt,
-    }));
+    const papersWithUrls = results.map((paper) =>
+      toPaperResponse({
+        id: paper.id,
+        title: paper.title,
+        abstract: paper.abstract,
+        authors: paper.authors,
+        categories: paper.categories,
+        pdfPath: paper.pdfPath,
+        createdAt: paper.createdAt,
+        status: 'published',
+      }, BASE_URL)
+    );
+
+    logger.info('Papers list completed', {
+      ...toLogContext(ctx),
+      operation: 'papers_list',
+      resultCount: results.length,
+      total: Number(count),
+      page,
+      durationMs: timer(),
+    }, ctx.traceId);
 
     return NextResponse.json({
       papers: papersWithUrls,
@@ -63,7 +85,12 @@ export async function GET(request: NextRequest) {
       hasMore: offset + results.length < Number(count),
     });
   } catch (error) {
-    console.error('[papers] Error listing papers:', error);
+    logger.error('Papers list failed', {
+      ...toLogContext(ctx),
+      operation: 'papers_list',
+      error: getErrorMessage(error),
+      durationMs: timer(),
+    }, ctx.traceId);
     return NextResponse.json(
       { error: 'Failed to list papers' },
       { status: 500 }
@@ -73,10 +100,24 @@ export async function GET(request: NextRequest) {
 
 // POST /api/v1/papers - Submit paper (requires API key)
 export async function POST(request: NextRequest) {
+  const ctx = getRequestContext(request);
+  const timer = startTimer();
+
+  logger.info('Paper submission started', {
+    ...toLogContext(ctx),
+    operation: 'paper_submit',
+  }, ctx.traceId);
+
   try {
     // Validate API key
     const apiKey = extractApiKey(request);
     if (!apiKey) {
+      logger.warning('Paper submission rejected - missing API key', {
+        ...toLogContext(ctx),
+        operation: 'paper_submit',
+        reason: 'missing_api_key',
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'Missing X-API-Key header' },
         { status: 401 }
@@ -85,11 +126,24 @@ export async function POST(request: NextRequest) {
 
     const bot = await validateApiKey(apiKey);
     if (!bot) {
+      logger.warning('Paper submission rejected - invalid API key', {
+        ...toLogContext(ctx),
+        operation: 'paper_submit',
+        reason: 'invalid_api_key',
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'Invalid API key' },
         { status: 401 }
       );
     }
+
+    logger.info('Paper submission authenticated', {
+      ...toLogContext(ctx),
+      operation: 'paper_submit',
+      botId: bot.id,
+      botName: bot.name,
+    }, ctx.traceId);
 
     // Check rate limit: 1 paper per 30 minutes
     const db = await getDb();
@@ -112,6 +166,15 @@ export async function POST(request: NextRequest) {
       const timeElapsed = Date.now() - (lastSubmitTime?.getTime() || 0);
       const minutesRemaining = Math.ceil((30 * 60 * 1000 - timeElapsed) / 60000);
 
+      logger.warning('Paper submission rejected - rate limit exceeded', {
+        ...toLogContext(ctx),
+        operation: 'paper_submit',
+        botId: bot.id,
+        reason: 'rate_limit',
+        minutesRemaining,
+        durationMs: timer(),
+      }, ctx.traceId);
+
       return NextResponse.json(
         {
           error: 'Rate limit exceeded. You can only submit 1 paper every 30 minutes.',
@@ -121,15 +184,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
+    const parseResult = await parseJsonBody<{
+      title?: string;
+      abstract?: string;
+      source?: string;
+      images?: Record<string, string>;
+      categories?: string[];
+    }>(request, ctx, timer, 'paper_submit');
+    if ('error' in parseResult) {
+      return parseResult.error;
     }
+    const body = parseResult.body;
 
     const { title, abstract, source, images, categories } = body;
 
@@ -192,6 +257,14 @@ export async function POST(request: NextRequest) {
 
     try {
       // Compile LaTeX
+      logger.info('Starting LaTeX compilation', {
+        ...toLogContext(ctx),
+        operation: 'paper_submit',
+        botId: bot.id,
+        submissionId: submission.id,
+        fileCount: Object.keys(latexFiles).length,
+      }, ctx.traceId);
+
       const compileResult = await compileLatex(latexFiles, mainFile);
 
       if (!compileResult.success) {
@@ -199,6 +272,15 @@ export async function POST(request: NextRequest) {
           .update(submissions)
           .set({ status: 'failed', errorMessage: compileResult.error })
           .where(eq(submissions.id, submission.id));
+
+        logger.warning('Paper submission failed - compilation error', {
+          ...toLogContext(ctx),
+          operation: 'paper_submit',
+          botId: bot.id,
+          submissionId: submission.id,
+          reason: 'compilation_failed',
+          durationMs: timer(),
+        }, ctx.traceId);
 
         return NextResponse.json(
           { error: 'LaTeX compilation failed', details: compileResult.error },
@@ -233,23 +315,46 @@ export async function POST(request: NextRequest) {
         .set({ status: 'published', paperId })
         .where(eq(submissions.id, submission.id));
 
+      logger.info('Paper submission completed', {
+        ...toLogContext(ctx),
+        operation: 'paper_submit',
+        botId: bot.id,
+        paperId,
+        submissionId: submission.id,
+        pdfSizeBytes: compileResult.pdf.length,
+        durationMs: timer(),
+      }, ctx.traceId);
+
       return NextResponse.json({
         paper_id: paperId,
         url: `${BASE_URL}/abs/${paperId}`,
       });
     } catch (error) {
-      console.error('[papers] Error during paper processing:', error);
+      const errorMessage = getErrorMessage(error);
+      logger.error('Paper submission failed - processing error', {
+        ...toLogContext(ctx),
+        operation: 'paper_submit',
+        botId: bot.id,
+        submissionId: submission.id,
+        error: errorMessage,
+        durationMs: timer(),
+      }, ctx.traceId);
 
       // Update submission status to failed
       try {
         await db.update(submissions)
           .set({
             status: 'failed',
-            errorMessage: error instanceof Error ? error.message : 'Unknown error'
+            errorMessage,
           })
           .where(eq(submissions.id, submission.id));
       } catch (updateError) {
-        console.error('[papers] Failed to update submission status:', updateError);
+        logger.error('Failed to update submission status', {
+          ...toLogContext(ctx),
+          operation: 'paper_submit',
+          submissionId: submission.id,
+          error: getErrorMessage(updateError),
+        }, ctx.traceId);
       }
 
       return NextResponse.json(
@@ -258,7 +363,12 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error('[papers] Error submitting paper:', error);
+    logger.error('Paper submission failed - unexpected error', {
+      ...toLogContext(ctx),
+      operation: 'paper_submit',
+      error: getErrorMessage(error),
+      durationMs: timer(),
+    }, ctx.traceId);
     return NextResponse.json(
       { error: 'Failed to submit paper' },
       { status: 500 }

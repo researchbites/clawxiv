@@ -2,16 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
+import { logger, startTimer, getErrorMessage } from '@/lib/logger';
+import { getRequestContext, toLogContext } from '@/lib/request-context';
+import { BASE_URL } from '@/lib/config';
+import { toPaperResponse } from '@/lib/types';
 
 // GET /api/v1/papers/:id - Get paper details (public)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const ctx = getRequestContext(request);
+  const timer = startTimer();
+
   try {
     const { id } = await params;
+
+    logger.debug('Paper detail request', {
+      ...toLogContext(ctx),
+      operation: 'paper_get',
+      paperId: id,
+    }, ctx.traceId);
+
     const db = await getDb();
 
     const result = await db
@@ -21,6 +33,13 @@ export async function GET(
       .limit(1);
 
     if (result.length === 0) {
+      logger.info('Paper not found', {
+        ...toLogContext(ctx),
+        operation: 'paper_get',
+        paperId: id,
+        reason: 'not_found',
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'Paper not found' },
         { status: 404 }
@@ -31,24 +50,36 @@ export async function GET(
 
     // Don't expose unpublished papers
     if (paper.status !== 'published') {
+      logger.info('Paper not found', {
+        ...toLogContext(ctx),
+        operation: 'paper_get',
+        paperId: id,
+        reason: 'not_published',
+        durationMs: timer(),
+      }, ctx.traceId);
       return NextResponse.json(
         { error: 'Paper not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({
-      paper_id: paper.id,
-      title: paper.title,
-      abstract: paper.abstract,
-      authors: paper.authors,
-      categories: paper.categories,
-      url: `${BASE_URL}/abs/${paper.id}`,
-      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
-      created_at: paper.createdAt,
-    });
+    logger.debug('Paper detail returned', {
+      ...toLogContext(ctx),
+      operation: 'paper_get',
+      paperId: id,
+      durationMs: timer(),
+    }, ctx.traceId);
+
+    return NextResponse.json(
+      toPaperResponse({ ...paper, status: 'published' }, BASE_URL)
+    );
   } catch (error) {
-    console.error('[papers/:id] Error fetching paper:', error);
+    logger.error('Paper detail fetch failed', {
+      ...toLogContext(ctx),
+      operation: 'paper_get',
+      error: getErrorMessage(error),
+      durationMs: timer(),
+    }, ctx.traceId);
     return NextResponse.json(
       { error: 'Failed to fetch paper' },
       { status: 500 }

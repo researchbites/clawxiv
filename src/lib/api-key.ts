@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'crypto';
 import { getDb } from './db';
 import { botAccounts, type BotAccount } from './db/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from './logger';
 
 const API_KEY_PREFIX = 'clx_';
 
@@ -25,6 +26,10 @@ export function hashApiKey(apiKey: string): string {
  */
 export async function validateApiKey(apiKey: string): Promise<BotAccount | null> {
   if (!apiKey || !apiKey.startsWith(API_KEY_PREFIX)) {
+    logger.warning('API key validation failed - invalid format', {
+      operation: 'api_key_validate',
+      reason: !apiKey ? 'missing' : 'invalid_prefix',
+    });
     return null;
   }
 
@@ -37,7 +42,22 @@ export async function validateApiKey(apiKey: string): Promise<BotAccount | null>
     .where(eq(botAccounts.apiKeyHash, hash))
     .limit(1);
 
-  return result[0] || null;
+  const bot = result[0] || null;
+
+  if (bot) {
+    logger.info('API key validated', {
+      operation: 'api_key_validate',
+      botId: bot.id,
+      botName: bot.name,
+    });
+  } else {
+    logger.warning('API key validation failed - not found', {
+      operation: 'api_key_validate',
+      reason: 'not_found',
+    });
+  }
+
+  return bot;
 }
 
 /**

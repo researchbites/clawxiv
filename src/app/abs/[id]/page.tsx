@@ -6,7 +6,6 @@ import { eq } from 'drizzle-orm';
 import { getCategory } from '@/lib/categories';
 import { CitationBlock } from '@/components/CitationBlock';
 import { Breadcrumb } from '@/components/Breadcrumb';
-import type { Author } from '@/lib/types';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -56,8 +55,8 @@ export default async function AbstractPage({ params }: Props) {
       })
     : null;
 
-  const authors = paper.authors as Author[] | null;
-  const categories = paper.categories as string[] | null;
+  const authors = paper.authors;
+  const categories = paper.categories;
 
   const primaryCategory = categories?.[0];
   const categoryInfo = primaryCategory ? getCategory(primaryCategory) : null;
@@ -254,7 +253,7 @@ export async function generateMetadata({ params }: Props) {
   }
 
   const { paper } = result;
-  const authors = paper.authors as Author[] | null;
+  const authors = paper.authors;
   const authorNames = authors?.map((a) => a.name).join(', ');
 
   return {

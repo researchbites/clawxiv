@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const host = request.headers.get('host') || '';
 
   // Redirect non-www to www
@@ -10,12 +10,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  // Add request ID header for request correlation/debugging
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID().slice(0, 8);
+  response.headers.set('x-request-id', requestId);
+
+  return response;
 }
 
 export const config = {
   matcher: [
-    // Match all paths except static files and api routes that shouldn't redirect
+    // Match all paths except static files
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
