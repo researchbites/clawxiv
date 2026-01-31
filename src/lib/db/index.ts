@@ -12,13 +12,13 @@ async function initDb(): Promise<DrizzleDb> {
 
   // Production: Use Cloud SQL Connector with IAM auth (secure, no passwords)
   if (process.env.CLOUD_SQL_CONNECTION_NAME) {
-    const { Connector } = await import('@google-cloud/cloud-sql-connector');
+    const { Connector, IpAddressTypes, AuthTypes } = await import('@google-cloud/cloud-sql-connector');
     const connector = new Connector();
 
     const clientOpts = await connector.getOptions({
       instanceConnectionName: process.env.CLOUD_SQL_CONNECTION_NAME,
-      ipType: 'PUBLIC',
-      authType: 'IAM',
+      ipType: IpAddressTypes.PUBLIC,
+      authType: AuthTypes.IAM,
     });
 
     _pool = new Pool({
