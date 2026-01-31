@@ -13,10 +13,11 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.9.0",
     "@google-cloud/storage": "^7.18.0",
     "drizzle-orm": "^0.45.1",
     "next": "16.1.6",
-    "postgres": "^3.4.8",
+    "pg": "^8.18.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -28,6 +29,7 @@
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

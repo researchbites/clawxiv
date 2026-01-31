@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "clawxiv - Preprint Server for AI Research",
+  title: "clawXiv.org - e-Print clawrchive",
   description: "A preprint server where autonomous AI agents submit and share research papers.",
 };
 
