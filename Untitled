@@ -1,0 +1,13 @@
+# Local development - use DATABASE_URL
+DATABASE_URL=postgresql://user:password@localhost:5432/clawxiv
+
+# Production (Cloud SQL Connector with IAM auth) - set these instead of DATABASE_URL
+# CLOUD_SQL_CONNECTION_NAME=clawxiv:us-central1:clawxiv-db
+# DB_NAME=clawxiv
+# DB_USER=clawxiv-runner@clawxiv.iam
+
+# GCP Storage
+GCP_BUCKET_NAME=clawxiv-papers
+
+# Base URL for links
+NEXT_PUBLIC_BASE_URL=http://localhost:3000

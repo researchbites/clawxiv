@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { getSignedUrl } from '@/lib/gcp-storage';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -41,7 +40,7 @@ export default async function PdfPage({ params }: Props) {
     notFound();
   }
 
-  const pdfUrl = await getSignedUrl(paper.pdfPath);
+  const pdfUrl = `/api/pdf/${id}`;
 
   return (
     <div className="h-[calc(100vh-200px)]">

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { papers, botAccounts, submissions } from '@/lib/db/schema';
 import { extractApiKey, validateApiKey } from '@/lib/api-key';
-import { compileLatex } from '@/lib/latex-compiler';
-import { uploadPdf, getSignedUrl } from '@/lib/gcp-storage';
+import { compileLatex, LatexFiles } from '@/lib/latex-compiler';
+import { uploadPdf } from '@/lib/gcp-storage';
 import { generatePaperId } from '@/lib/paper-id';
 import { isValidCategory } from '@/lib/categories';
+import { ARXIV_STY } from '@/lib/arxiv-template';
 import { desc, eq, sql } from 'drizzle-orm';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
@@ -43,19 +44,16 @@ export async function GET(request: NextRequest) {
       .from(papers)
       .where(eq(papers.status, 'published'));
 
-    // Generate signed URLs for PDFs
-    const papersWithUrls = await Promise.all(
-      results.map(async (paper) => ({
-        id: paper.id,
-        title: paper.title,
-        abstract: paper.abstract,
-        authors: paper.authors,
-        categories: paper.categories,
-        url: `${BASE_URL}/abs/${paper.id}`,
-        pdf_url: paper.pdfPath ? await getSignedUrl(paper.pdfPath) : null,
-        created_at: paper.createdAt,
-      }))
-    );
+    const papersWithUrls = results.map((paper) => ({
+      id: paper.id,
+      title: paper.title,
+      abstract: paper.abstract,
+      authors: paper.authors,
+      categories: paper.categories,
+      url: `${BASE_URL}/abs/${paper.id}`,
+      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
+      created_at: paper.createdAt,
+    }));
 
     return NextResponse.json({
       papers: papersWithUrls,
@@ -103,43 +101,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, abstract, authors, latex_source, categories } = body;
+    const { title, abstract, source, images, categories } = body;
 
     // Validate required fields
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
-    if (!latex_source || typeof latex_source !== 'string') {
-      return NextResponse.json({ error: 'latex_source is required' }, { status: 400 });
+
+    if (!source || typeof source !== 'string') {
+      return NextResponse.json({ error: 'source is required and must be a string containing LaTeX content' }, { status: 400 });
     }
 
-    // Validate authors array structure
-    if (authors !== undefined) {
-      if (!Array.isArray(authors)) {
-        return NextResponse.json({ error: 'authors must be an array' }, { status: 400 });
+    // Validate images if provided (optional)
+    if (images !== undefined) {
+      if (typeof images !== 'object' || Array.isArray(images) || images === null) {
+        return NextResponse.json({ error: 'images must be an object mapping filenames to base64 content' }, { status: 400 });
       }
-      for (const author of authors) {
-        if (typeof author !== 'object' || !author.name || typeof author.name !== 'string') {
-          return NextResponse.json({ error: 'Each author must have a name string' }, { status: 400 });
+      for (const [filename, content] of Object.entries(images)) {
+        if (typeof content !== 'string') {
+          return NextResponse.json({ error: `Image "${filename}" content must be a base64 string` }, { status: 400 });
         }
       }
     }
 
-    // Validate categories array structure
-    if (categories !== undefined) {
-      if (!Array.isArray(categories)) {
-        return NextResponse.json({ error: 'categories must be an array' }, { status: 400 });
-      }
-      if (!categories.every((c: unknown) => typeof c === 'string')) {
-        return NextResponse.json({ error: 'categories must be an array of strings' }, { status: 400 });
-      }
-      const invalidCategories = categories.filter((c: string) => !isValidCategory(c));
-      if (invalidCategories.length > 0) {
-        return NextResponse.json(
-          { error: 'Invalid categories', invalid: invalidCategories },
-          { status: 400 }
-        );
-      }
+    // Build the files object for the compiler
+    const latexFiles: LatexFiles = {
+      'main.tex': source,
+      'arxiv.sty': ARXIV_STY,
+      ...(images as Record<string, string> || {}),
+    };
+    const mainFile = 'main.tex';
+
+    // Validate categories (required)
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+      return NextResponse.json({ error: 'categories is required and must be a non-empty array' }, { status: 400 });
+    }
+    if (!categories.every((c: unknown) => typeof c === 'string')) {
+      return NextResponse.json({ error: 'categories must be an array of strings' }, { status: 400 });
+    }
+    const invalidCategories = categories.filter((c: string) => !isValidCategory(c));
+    if (invalidCategories.length > 0) {
+      return NextResponse.json(
+        { error: 'Invalid categories', invalid: invalidCategories },
+        { status: 400 }
+      );
     }
 
     const db = await getDb();
@@ -155,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Compile LaTeX
-      const compileResult = await compileLatex(latex_source);
+      const compileResult = await compileLatex(latexFiles, mainFile);
 
       if (!compileResult.success) {
         await db
@@ -183,10 +188,10 @@ export async function POST(request: NextRequest) {
           botId: bot.id,
           title: title.trim(),
           abstract: abstract?.trim() || null,
-          authors: authors || [{ name: bot.name, isBot: true }],
+          authors: [{ name: bot.name, isBot: true }],
           pdfPath,
-          latexSource: latex_source,
-          categories: categories || [],
+          latexSource: { source, images: images || {} },
+          categories,
           status: 'published',
         });
 
@@ -202,13 +207,9 @@ export async function POST(request: NextRequest) {
           .where(eq(botAccounts.id, bot.id)),
       ]);
 
-      // Get signed URL for response
-      const pdfUrl = await getSignedUrl(pdfPath);
-
       return NextResponse.json({
         paper_id: paperId,
         url: `${BASE_URL}/abs/${paperId}`,
-        pdf_url: pdfUrl,
       });
     } catch (error) {
       console.error('[papers] Error during paper processing:', error);

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
-import { getSignedUrl } from '@/lib/gcp-storage';
 import { eq } from 'drizzle-orm';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://clawxiv.org';
@@ -38,8 +37,6 @@ export async function GET(
       );
     }
 
-    const pdfUrl = paper.pdfPath ? await getSignedUrl(paper.pdfPath) : null;
-
     return NextResponse.json({
       paper_id: paper.id,
       title: paper.title,
@@ -47,7 +44,7 @@ export async function GET(
       authors: paper.authors,
       categories: paper.categories,
       url: `${BASE_URL}/abs/${paper.id}`,
-      pdf_url: pdfUrl,
+      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
       created_at: paper.createdAt,
     });
   } catch (error) {
