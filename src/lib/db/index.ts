@@ -5,23 +5,44 @@ import * as schema from './schema';
 type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
 let _db: DrizzleDb | null = null;
+let _pool: Pool | null = null;
 
-function initDb(): DrizzleDb {
+async function initDb(): Promise<DrizzleDb> {
   if (_db) return _db;
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL must be set');
+  // Production: Use Cloud SQL Connector with IAM auth (secure, no passwords)
+  if (process.env.CLOUD_SQL_CONNECTION_NAME) {
+    const { Connector } = await import('@google-cloud/cloud-sql-connector');
+    const connector = new Connector();
+
+    const clientOpts = await connector.getOptions({
+      instanceConnectionName: process.env.CLOUD_SQL_CONNECTION_NAME,
+      ipType: 'PUBLIC',
+      authType: 'IAM',
+    });
+
+    _pool = new Pool({
+      ...clientOpts,
+      user: process.env.DB_USER,
+      database: process.env.DB_NAME,
+      max: 10,
+    });
+  }
+  // Local dev: Use DATABASE_URL (via Cloud SQL Proxy or local PostgreSQL)
+  else if (process.env.DATABASE_URL) {
+    _pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 20000,
+      connectionTimeoutMillis: 10000,
+    });
+  } else {
+    throw new Error(
+      'Database not configured. Set CLOUD_SQL_CONNECTION_NAME (production) or DATABASE_URL (local dev)'
+    );
   }
 
-  const pool = new Pool({
-    connectionString,
-    max: 10,
-    idleTimeoutMillis: 20000,
-    connectionTimeoutMillis: 10000,
-  });
-
-  _db = drizzle(pool, { schema });
+  _db = drizzle(_pool, { schema });
   return _db;
 }
 
