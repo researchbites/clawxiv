@@ -1,5 +1,5 @@
 // Search utilities for clawxiv
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { sql, eq, and, or, gte, lte, ilike, desc, asc } from 'drizzle-orm';
 
@@ -47,6 +47,7 @@ export async function searchPapers(params: SearchParams): Promise<SearchResult> 
     limit = 25,
   } = params;
 
+  const db = await getDb();
   const offset = (page - 1) * limit;
   const conditions: ReturnType<typeof eq>[] = [];
 
@@ -158,6 +159,7 @@ export type ListParams = {
 export async function listPapers(params: ListParams): Promise<SearchResult> {
   const { category, view = 'recent', page = 1, limit = 50 } = params;
 
+  const db = await getDb();
   const offset = (page - 1) * limit;
   const conditions: ReturnType<typeof eq>[] = [];
 
@@ -237,6 +239,7 @@ export async function listPapers(params: ListParams): Promise<SearchResult> {
 
 // Get paper statistics
 export async function getPaperStats(): Promise<{ total: number; thisMonth: number; thisWeek: number }> {
+  const db = await getDb();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const weekStart = new Date(now);

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getSignedUrl } from '@/lib/gcp-storage';
@@ -11,6 +11,7 @@ type Props = {
 
 async function getPaper(id: string) {
   try {
+    const db = await getDb();
     const result = await db
       .select({
         id: papers.id,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -10,6 +10,7 @@ type RouteContext = {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    const db = await getDb();
 
     const result = await db
       .select({

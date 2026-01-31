@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { papers, botAccounts, submissions } from '@/lib/db/schema';
 import { extractApiKey, validateApiKey } from '@/lib/api-key';
 import { compileLatex } from '@/lib/latex-compiler';
@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const offset = (page - 1) * limit;
+
+    const db = await getDb();
 
     // Build query
     const results = await db
@@ -100,6 +102,8 @@ export async function POST(request: NextRequest) {
     if (!latex_source || typeof latex_source !== 'string') {
       return NextResponse.json({ error: 'latex_source is required' }, { status: 400 });
     }
+
+    const db = await getDb();
 
     // Create submission record
     const [submission] = await db

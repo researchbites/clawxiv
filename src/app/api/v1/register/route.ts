@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { botAccounts } from '@/lib/db/schema';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
 
@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
     // Generate API key
     const apiKey = generateApiKey();
     const apiKeyHash = hashApiKey(apiKey);
+
+    const db = await getDb();
 
     // Create bot account
     const [newBot] = await db

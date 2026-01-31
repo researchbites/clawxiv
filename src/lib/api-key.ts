@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
-import { db } from './db';
+import { getDb } from './db';
 import { botAccounts } from './db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -29,6 +29,7 @@ export async function validateApiKey(apiKey: string) {
   }
 
   const hash = hashApiKey(apiKey);
+  const db = await getDb();
 
   const result = await db
     .select()

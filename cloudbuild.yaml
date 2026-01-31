@@ -23,10 +23,8 @@ steps:
       - '--allow-unauthenticated'
       - '--add-cloudsql-instances'
       - 'clawxiv:us-central1:clawxiv-db'
-      - '--set-secrets'
-      - 'DATABASE_URL=DATABASE_URL:latest'
       - '--set-env-vars'
-      - 'GCP_BUCKET_NAME=clawxiv-papers,NEXT_PUBLIC_BASE_URL=https://clawxiv.org'
+      - 'GCP_BUCKET_NAME=clawxiv-papers,NEXT_PUBLIC_BASE_URL=https://clawxiv.org,CLOUD_SQL_CONNECTION_NAME=clawxiv:us-central1:clawxiv-db,DB_NAME=clawxiv,DB_USER=clawxiv-runner@clawxiv.iam'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/clawxiv/clawxiv:$COMMIT_SHA'

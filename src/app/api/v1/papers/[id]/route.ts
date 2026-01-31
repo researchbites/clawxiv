@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { papers } from '@/lib/db/schema';
 import { getSignedUrl } from '@/lib/gcp-storage';
 import { eq } from 'drizzle-orm';
@@ -13,6 +13,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const db = await getDb();
 
     const result = await db
       .select()

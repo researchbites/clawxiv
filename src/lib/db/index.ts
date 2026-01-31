@@ -1,51 +1,79 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import { Connector, AuthTypes } from '@google-cloud/cloud-sql-connector';
 import * as schema from './schema';
 
-// Lazy initialization to avoid build-time errors
-let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
-function parseConnectionString(connectionString: string) {
-  // Handle Cloud SQL socket format: postgresql://user:pass@/dbname?host=/cloudsql/project:region:instance
-  const socketMatch = connectionString.match(/\?host=(.+)$/);
-  if (socketMatch) {
-    const socketPath = socketMatch[1];
-    const baseUrl = connectionString.replace(/\?host=.+$/, '');
-    // Parse credentials from URL format: postgresql://user:pass@/dbname
-    const match = baseUrl.match(/postgresql:\/\/([^:]+):([^@]+)@\/(.+)/);
-    if (match) {
-      return {
-        user: match[1],
-        password: match[2],
-        database: match[3],
-        host: socketPath,
-      };
-    }
-  }
-  // For standard URLs, return as-is
-  return connectionString;
-}
+let _db: DrizzleDb | null = null;
+let _connector: Connector | null = null;
+let _initPromise: Promise<DrizzleDb> | null = null;
 
-function getDb() {
+async function initDb(): Promise<DrizzleDb> {
   if (_db) return _db;
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is not set');
+  // Check if we're using Cloud SQL Connector (production) or direct connection (local dev)
+  const instanceConnectionName = process.env.CLOUD_SQL_CONNECTION_NAME;
+
+  if (instanceConnectionName) {
+    // Production: Use Cloud SQL Connector with IAM auth
+    const database = process.env.DB_NAME || 'clawxiv';
+    const user = process.env.DB_USER;
+
+    if (!user) {
+      throw new Error('DB_USER must be set when using Cloud SQL Connector');
+    }
+
+    _connector = new Connector();
+    const clientOpts = await _connector.getOptions({
+      instanceConnectionName,
+      authType: AuthTypes.IAM,
+    });
+
+    const pool = new Pool({
+      ...clientOpts,
+      user,
+      database,
+      max: 10,
+      idleTimeoutMillis: 20000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    _db = drizzle(pool, { schema });
+  } else {
+    // Local development: Use DATABASE_URL directly
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL or CLOUD_SQL_CONNECTION_NAME must be set');
+    }
+
+    const pool = new Pool({
+      connectionString,
+      max: 10,
+      idleTimeoutMillis: 20000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    _db = drizzle(pool, { schema });
   }
 
-  const config = parseConnectionString(connectionString);
-  const client = typeof config === 'string'
-    ? postgres(config, { max: 10, idle_timeout: 20, connect_timeout: 10 })
-    : postgres({ ...config, max: 10, idle_timeout: 20, connect_timeout: 10 });
-
-  _db = drizzle(client, { schema });
   return _db;
 }
 
-// Export a proxy that lazily initializes the db
-export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+// Export async getter for API routes and server components
+export async function getDb(): Promise<DrizzleDb> {
+  if (_db) return _db;
+  if (_initPromise) return _initPromise;
+  _initPromise = initDb();
+  return _initPromise;
+}
+
+// Proxy for backwards compatibility - throws helpful error
+export const db = new Proxy({} as DrizzleDb, {
   get(_, prop) {
-    return getDb()[prop as keyof typeof _db];
+    throw new Error(
+      `db.${String(prop)} was called synchronously. ` +
+      'Database access is now async. Use `const db = await getDb()` instead.'
+    );
   },
 });
