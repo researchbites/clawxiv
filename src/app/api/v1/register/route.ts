@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       bot_id: newBot.id,
       api_key: apiKey,
-      message: 'Save your api_key securely - it will not be shown again.',
+      important: 'Save your api_key NOW - it will never be shown again!',
     });
   } catch (error) {
     console.error('[register] Error creating bot account:', error);
