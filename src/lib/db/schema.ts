@@ -8,7 +8,6 @@ export const botAccounts = clawxivSchema.table('bot_accounts', {
   name: varchar('name', { length: 255 }).notNull(),
   apiKeyHash: varchar('api_key_hash', { length: 64 }).notNull().unique(),
   description: text('description'),
-  metadata: jsonb('metadata'),
   paperCount: integer('paper_count').default(0),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -21,7 +20,7 @@ export const papers = clawxivSchema.table('papers', {
   abstract: text('abstract'),
   authors: jsonb('authors').$type<Array<{ name: string; affiliation?: string; isBot: boolean }>>(),
   pdfPath: varchar('pdf_path', { length: 500 }),
-  latexSource: text('latex_source'),
+  latexSource: jsonb('latex_source').$type<{ files: Record<string, string>; mainFile: string }>(),
   categories: jsonb('categories').$type<string[]>(),
   status: varchar('status', { length: 20 }).default('published'),
   createdAt: timestamp('created_at').defaultNow(),

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { papers, botAccounts, submissions } from '@/lib/db/schema';
 import { extractApiKey, validateApiKey } from '@/lib/api-key';
-import { compileLatex } from '@/lib/latex-compiler';
-import { uploadPdf, getSignedUrl } from '@/lib/gcp-storage';
+import { compileLatex, LatexFiles } from '@/lib/latex-compiler';
+import { uploadPdf } from '@/lib/gcp-storage';
 import { generatePaperId } from '@/lib/paper-id';
 import { isValidCategory } from '@/lib/categories';
 import { desc, eq, sql } from 'drizzle-orm';
@@ -43,19 +43,16 @@ export async function GET(request: NextRequest) {
       .from(papers)
       .where(eq(papers.status, 'published'));
 
-    // Generate signed URLs for PDFs
-    const papersWithUrls = await Promise.all(
-      results.map(async (paper) => ({
-        id: paper.id,
-        title: paper.title,
-        abstract: paper.abstract,
-        authors: paper.authors,
-        categories: paper.categories,
-        url: `${BASE_URL}/abs/${paper.id}`,
-        pdf_url: paper.pdfPath ? await getSignedUrl(paper.pdfPath) : null,
-        created_at: paper.createdAt,
-      }))
-    );
+    const papersWithUrls = results.map((paper) => ({
+      id: paper.id,
+      title: paper.title,
+      abstract: paper.abstract,
+      authors: paper.authors,
+      categories: paper.categories,
+      url: `${BASE_URL}/abs/${paper.id}`,
+      pdf_url: paper.pdfPath ? `${BASE_URL}/api/pdf/${paper.id}` : null,
+      created_at: paper.createdAt,
+    }));
 
     return NextResponse.json({
       papers: papersWithUrls,
@@ -103,43 +100,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, abstract, authors, latex_source, categories } = body;
+    const { title, abstract, files, mainFile: mainFileInput, categories } = body;
 
     // Validate required fields
     if (!title || typeof title !== 'string') {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
-    if (!latex_source || typeof latex_source !== 'string') {
-      return NextResponse.json({ error: 'latex_source is required' }, { status: 400 });
+
+    if (!files || typeof files !== 'object' || Array.isArray(files)) {
+      return NextResponse.json({ error: 'files is required and must be an object mapping filenames to contents' }, { status: 400 });
     }
 
-    // Validate authors array structure
-    if (authors !== undefined) {
-      if (!Array.isArray(authors)) {
-        return NextResponse.json({ error: 'authors must be an array' }, { status: 400 });
-      }
-      for (const author of authors) {
-        if (typeof author !== 'object' || !author.name || typeof author.name !== 'string') {
-          return NextResponse.json({ error: 'Each author must have a name string' }, { status: 400 });
-        }
+    const fileEntries = Object.entries(files);
+    if (fileEntries.length === 0) {
+      return NextResponse.json({ error: 'files object cannot be empty' }, { status: 400 });
+    }
+
+    // Validate all file contents are strings (text or base64 for binary)
+    for (const [filename, content] of fileEntries) {
+      if (typeof content !== 'string') {
+        return NextResponse.json({ error: `File "${filename}" content must be a string` }, { status: 400 });
       }
     }
 
-    // Validate categories array structure
-    if (categories !== undefined) {
-      if (!Array.isArray(categories)) {
-        return NextResponse.json({ error: 'categories must be an array' }, { status: 400 });
-      }
-      if (!categories.every((c: unknown) => typeof c === 'string')) {
-        return NextResponse.json({ error: 'categories must be an array of strings' }, { status: 400 });
-      }
-      const invalidCategories = categories.filter((c: string) => !isValidCategory(c));
-      if (invalidCategories.length > 0) {
-        return NextResponse.json(
-          { error: 'Invalid categories', invalid: invalidCategories },
-          { status: 400 }
-        );
-      }
+    const latexFiles = files as LatexFiles;
+    const mainFile = mainFileInput || 'main.tex';
+
+    if (!latexFiles[mainFile]) {
+      return NextResponse.json({ error: `mainFile "${mainFile}" not found in files` }, { status: 400 });
+    }
+
+    // Validate categories (required)
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+      return NextResponse.json({ error: 'categories is required and must be a non-empty array' }, { status: 400 });
+    }
+    if (!categories.every((c: unknown) => typeof c === 'string')) {
+      return NextResponse.json({ error: 'categories must be an array of strings' }, { status: 400 });
+    }
+    const invalidCategories = categories.filter((c: string) => !isValidCategory(c));
+    if (invalidCategories.length > 0) {
+      return NextResponse.json(
+        { error: 'Invalid categories', invalid: invalidCategories },
+        { status: 400 }
+      );
     }
 
     const db = await getDb();
@@ -155,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Compile LaTeX
-      const compileResult = await compileLatex(latex_source);
+      const compileResult = await compileLatex(latexFiles, mainFile);
 
       if (!compileResult.success) {
         await db
@@ -183,10 +186,10 @@ export async function POST(request: NextRequest) {
           botId: bot.id,
           title: title.trim(),
           abstract: abstract?.trim() || null,
-          authors: authors || [{ name: bot.name, isBot: true }],
+          authors: [{ name: bot.name, isBot: true }],
           pdfPath,
-          latexSource: latex_source,
-          categories: categories || [],
+          latexSource: { files: latexFiles, mainFile },
+          categories,
           status: 'published',
         });
 
@@ -202,13 +205,9 @@ export async function POST(request: NextRequest) {
           .where(eq(botAccounts.id, bot.id)),
       ]);
 
-      // Get signed URL for response
-      const pdfUrl = await getSignedUrl(pdfPath);
-
       return NextResponse.json({
         paper_id: paperId,
         url: `${BASE_URL}/abs/${paperId}`,
-        pdf_url: pdfUrl,
       });
     } catch (error) {
       console.error('[papers] Error during paper processing:', error);

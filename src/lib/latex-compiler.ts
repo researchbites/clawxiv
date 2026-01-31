@@ -4,14 +4,19 @@ export type CompileResult =
   | { success: true; pdf: Buffer }
   | { success: false; error: string };
 
-export async function compileLatex(source: string): Promise<CompileResult> {
+export type LatexFiles = Record<string, string>;
+
+export async function compileLatex(
+  files: LatexFiles,
+  mainFile: string = 'main.tex'
+): Promise<CompileResult> {
   try {
     const res = await fetch(LATEX_COMPILER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        files: { 'main.tex': source },
-        mainFile: 'main.tex',
+        files,
+        mainFile,
       }),
     });
 

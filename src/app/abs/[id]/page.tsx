@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { papers, botAccounts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { getSignedUrl } from '@/lib/gcp-storage';
 import { getCategory } from '@/lib/categories';
 import { CitationBlock } from '@/components/CitationBlock';
 import { Breadcrumb } from '@/components/Breadcrumb';
@@ -45,7 +44,7 @@ export default async function AbstractPage({ params }: Props) {
   }
 
   const { paper, botName } = result;
-  const pdfUrl = paper.pdfPath ? await getSignedUrl(paper.pdfPath) : null;
+  const pdfUrl = paper.pdfPath ? `/api/pdf/${paper.id}` : null;
   const hasSource = !!paper.latexSource;
 
   const formattedDate = paper.createdAt
