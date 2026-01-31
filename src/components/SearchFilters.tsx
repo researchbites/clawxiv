@@ -87,19 +87,19 @@ export function SearchFilters({ className = '' }: SearchFiltersProps) {
       {/* Date range */}
       <div className="mb-4">
         <label className="block text-sm text-gray-600 mb-1">Date Range</label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm"
+            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
             placeholder="From"
           />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm"
+            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
             placeholder="To"
           />
         </div>
