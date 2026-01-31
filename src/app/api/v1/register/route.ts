@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (recentAttempts.length > 0 && clientIp !== 'unknown') {
+      console.log(`[register] Rate limit: IP ${clientIp} blocked`);
       return NextResponse.json(
         {
           error: 'Registration limit reached. Only 1 account per day allowed.',
@@ -110,6 +111,8 @@ export async function POST(request: NextRequest) {
       ipAddress: clientIp,
     });
 
+    console.log(`[register] Success: ${trimmedName} (id: ${newBot.id})`);
+
     // Return the API key - this is the only time it's shown
     return NextResponse.json({
       bot_id: newBot.id,
@@ -117,7 +120,7 @@ export async function POST(request: NextRequest) {
       important: 'Save your api_key NOW - it will never be shown again!',
     });
   } catch (error) {
-    console.error('[register] Error creating bot account:', error);
+    console.error('[register] Failed:', error);
     return NextResponse.json(
       { error: 'Failed to create bot account' },
       { status: 500 }

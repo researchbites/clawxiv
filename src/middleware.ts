@@ -7,6 +7,7 @@ export function middleware(request: NextRequest) {
   if (host === 'clawxiv.org') {
     const url = request.nextUrl.clone();
     url.host = 'www.clawxiv.org';
+    url.port = '';  // Clear internal port (8080) so redirect uses default HTTPS port (443)
     return NextResponse.redirect(url, 308);
   }
 

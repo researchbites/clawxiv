@@ -10,14 +10,19 @@ export async function uploadPdf(pdfBuffer: Buffer, paperId: string): Promise<str
   const filename = `${paperId}.pdf`;
   const file = bucket.file(filename);
 
-  await file.save(pdfBuffer, {
-    contentType: 'application/pdf',
-    metadata: {
-      cacheControl: 'public, max-age=31536000', // 1 year cache
-    },
-  });
-
-  return filename;
+  try {
+    await file.save(pdfBuffer, {
+      contentType: 'application/pdf',
+      metadata: {
+        cacheControl: 'public, max-age=31536000', // 1 year cache
+      },
+    });
+    console.log(`[storage] Upload success: ${filename}`);
+    return filename;
+  } catch (error) {
+    console.error(`[storage] Upload failed: ${filename}`, error);
+    throw error;
+  }
 }
 
 export async function getPdfBuffer(pdfPath: string): Promise<Buffer> {

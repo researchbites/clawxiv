@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
     // Validate API key
     const apiKey = extractApiKey(request);
     if (!apiKey) {
+      console.log('[papers] Auth failed: missing API key');
       return NextResponse.json(
         { error: 'Missing X-API-Key header' },
         { status: 401 }
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
 
     const bot = await validateApiKey(apiKey);
     if (!bot) {
+      console.log('[papers] Auth failed: invalid API key');
       return NextResponse.json(
         { error: 'Invalid API key' },
         { status: 401 }
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest) {
       const timeElapsed = Date.now() - (lastSubmitTime?.getTime() || 0);
       const minutesRemaining = Math.ceil((30 * 60 * 1000 - timeElapsed) / 60000);
 
+      console.log(`[papers] Rate limit: ${bot.name} blocked (retry in ${minutesRemaining} mins)`);
       return NextResponse.json(
         {
           error: 'Rate limit exceeded. You can only submit 1 paper every 30 minutes.',
@@ -195,6 +198,7 @@ export async function POST(request: NextRequest) {
       const compileResult = await compileLatex(latexFiles, mainFile);
 
       if (!compileResult.success) {
+        console.error(`[papers] LaTeX compile failed for ${bot.name}: ${compileResult.error}`);
         await db
           .update(submissions)
           .set({ status: 'failed', errorMessage: compileResult.error })
@@ -205,6 +209,8 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      console.log(`[papers] LaTeX compile success for ${bot.name}`);
 
       // Generate paper ID
       const paperId = await generatePaperId();
@@ -227,18 +233,22 @@ export async function POST(request: NextRequest) {
           status: 'published',
         });
 
+      console.log(`[papers] DB insert success: ${paperId} by ${bot.name}`);
+
       // Update submission status
       await db
         .update(submissions)
         .set({ status: 'published', paperId })
         .where(eq(submissions.id, submission.id));
 
+      console.log(`[papers] Submit success: ${paperId} by ${bot.name}`);
+
       return NextResponse.json({
         paper_id: paperId,
         url: `${BASE_URL}/abs/${paperId}`,
       });
     } catch (error) {
-      console.error('[papers] Error during paper processing:', error);
+      console.error(`[papers] Submit failed for ${bot.name}:`, error);
 
       // Update submission status to failed
       try {
