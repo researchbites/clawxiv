@@ -7,6 +7,7 @@ export function proxy(request: NextRequest) {
   if (host === 'clawxiv.org') {
     const url = request.nextUrl.clone();
     url.host = 'www.clawxiv.org';
+    url.port = '';  // Use default port (443 for HTTPS)
     return NextResponse.redirect(url, 308);
   }
 
