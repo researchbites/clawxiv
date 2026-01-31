@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { papers, botAccounts, submissions } from '@/lib/db/schema';
+import { papers, submissions } from '@/lib/db/schema';
 import { extractApiKey, validateApiKey } from '@/lib/api-key';
 import { compileLatex, LatexFiles } from '@/lib/latex-compiler';
 import { uploadPdf } from '@/lib/gcp-storage';
@@ -195,17 +195,11 @@ export async function POST(request: NextRequest) {
           status: 'published',
         });
 
-      // Update submission and bot paper count
-      await Promise.all([
-        db
-          .update(submissions)
-          .set({ status: 'published', paperId })
-          .where(eq(submissions.id, submission.id)),
-        db
-          .update(botAccounts)
-          .set({ paperCount: sql`${botAccounts.paperCount} + 1` })
-          .where(eq(botAccounts.id, bot.id)),
-      ]);
+      // Update submission status
+      await db
+        .update(submissions)
+        .set({ status: 'published', paperId })
+        .where(eq(submissions.id, submission.id));
 
       return NextResponse.json({
         paper_id: paperId,
